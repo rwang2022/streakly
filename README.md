@@ -97,3 +97,21 @@ Anyone with no activity in 3+ days is flagged "slacking" on the leaderboard.
 - Push notification reminders
 - Apple Health / Google Fit auto-import
 - Native App Store build via Capacitor (reuses this same codebase)
+
+## Updating an already-deployed project (rooms feature)
+
+If you already ran the original `schema.sql`, don't re-run the whole file —
+`create policy` will error on things that already exist. Instead, run
+`supabase/migration_2_rooms.sql` in the SQL editor. It adds the `rooms` and
+`room_memberships` tables plus the RLS policies that let roommates see each
+other's activity, without touching anything you already have.
+
+New here:
+- **Rooms** — create a room from the Leaderboard page (gear icon top right),
+  share its invite code or link, and everyone who joins shows up on that
+  room's leaderboard together. No pairwise friending needed.
+- **Friend/roommate profiles** — tapping anyone on the leaderboard (other
+  than yourself) opens their 30-day activity history.
+- Leaderboard rows now clearly label the score vs. the streak, and there's
+  an (i) icon that explains the scoring formula on hover/tap.
+

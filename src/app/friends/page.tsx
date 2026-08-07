@@ -67,10 +67,7 @@ export default function FriendsPage() {
   }, []);
 
   useEffect(() => {
-    if (!myId || query.trim().length < 2) {
-      setResults([]);
-      return;
-    }
+    if (!myId || query.trim().length < 2) return;
     const handle = setTimeout(async () => {
       const { data } = await supabase
         .from("profiles")
@@ -83,6 +80,8 @@ export default function FriendsPage() {
     }, 250);
     return () => clearTimeout(handle);
   }, [query, myId, supabase]);
+
+  const visibleResults = query.trim().length < 2 ? [] : results;
 
   const accepted = friendships.filter((f) => f.status === "accepted");
   const incoming = friendships.filter(
@@ -131,9 +130,9 @@ export default function FriendsPage() {
           />
         </div>
 
-        {results.length > 0 && (
+        {visibleResults.length > 0 && (
           <div className="mt-3 space-y-2">
-            {results.map((p) => (
+            {visibleResults.map((p) => (
               <div
                 key={p.id}
                 className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3"

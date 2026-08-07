@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { BottomNav } from "@/components/BottomNav";
 import type { Activity } from "@/lib/types";
+import { daysAgoIso } from "@/lib/date";
 import { Dumbbell, Mountain, PersonStanding, Zap, Sparkles } from "lucide-react";
 
 const WEEKS = 12;
@@ -25,7 +26,7 @@ export default async function HistoryPage() {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const since = new Date(Date.now() - WEEKS * 7 * DAY_MS).toISOString();
+  const since = daysAgoIso(WEEKS * 7);
   const { data } = await supabase
     .from("activities")
     .select("*")
