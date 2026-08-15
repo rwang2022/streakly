@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flame, Settings2, Skull } from "lucide-react";
+import { Flag, Flame, Settings2, Skull } from "lucide-react";
 import { getLeaderboard, getMyRooms } from "@/lib/leaderboard";
 import { BottomNav } from "@/components/BottomNav";
 import { ScoreInfo } from "@/components/ScoreInfo";
@@ -101,6 +101,7 @@ export default async function LeaderboardPage({
               entry={entry}
               rank={i + 1}
               todayKey={todayKey}
+              roomId={roomId}
             />
           ))}
         </div>
@@ -114,10 +115,12 @@ function Row({
   entry,
   rank,
   todayKey,
+  roomId,
 }: {
   entry: LeaderboardEntry;
   rank: number;
   todayKey: string;
+  roomId?: string;
 }) {
   const badge = getBadge(entry);
   const daysSince = daysSinceLastActive(entry.lastActiveDate, todayKey);
@@ -165,6 +168,14 @@ function Row({
             {entry.profile.display_name ?? `@${entry.profile.username}`}
             {entry.isMe && <span className="ml-1 text-xs text-muted">(you)</span>}
           </p>
+          {entry.isSuspicious && (
+            <span
+              title={entry.suspicionReason ?? "Looks gamed"}
+              className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+            >
+              <Flag size={9} /> sus
+            </span>
+          )}
         </div>
         <p
           className={`mt-0.5 flex items-center gap-1 text-xs ${
@@ -212,5 +223,11 @@ function Row({
 
   if (entry.isMe) return inner;
 
-  return <Link href={`/profile/${entry.profile.id}`}>{inner}</Link>;
+  // Carry the active room (if any) along so the profile page's back link
+  // can return here instead of always dropping back to the Friends tab.
+  const profileHref = roomId
+    ? `/profile/${entry.profile.id}?room=${roomId}`
+    : `/profile/${entry.profile.id}`;
+
+  return <Link href={profileHref}>{inner}</Link>;
 }

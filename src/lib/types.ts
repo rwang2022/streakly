@@ -39,6 +39,8 @@ export interface LeaderboardEntry {
   isSlacking: boolean;
   isMe: boolean;
   lastActiveDate: string | null;
+  isSuspicious: boolean;
+  suspicionReason: string | null;
 }
 
 export interface Room {

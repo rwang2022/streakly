@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ArrowLeft, Flame, Dumbbell, Mountain, PersonStanding, Zap, Sparkles } from "lucide-react";
+import { ArrowLeft, Flag, Flame, Dumbbell, Mountain, PersonStanding, Zap, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser, getRequestTimeZone } from "@/lib/auth";
 import { computeScore } from "@/lib/scoring";
+import { detectSuspiciousPattern } from "@/lib/fraud";
 import { getBadge } from "@/lib/badges";
 import { BottomNav } from "@/components/BottomNav";
 import type { Activity } from "@/lib/types";
@@ -21,10 +22,14 @@ const ICONS: Record<string, React.ReactNode> = {
 
 export default async function ProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ room?: string }>;
 }) {
   const { id } = await params;
+  const { room: roomId } = await searchParams;
+  const backHref = roomId ? `/leaderboard?room=${roomId}` : "/leaderboard";
   const supabase = await createClient();
 
   const [{ data: { user } }, timeZone] = await Promise.all([
@@ -42,7 +47,7 @@ export default async function ProfilePage({
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
         <p className="text-muted">This person couldn&apos;t be found.</p>
-        <Link href="/leaderboard" className="mt-4 text-sm text-accent">
+        <Link href={backHref} className="mt-4 text-sm text-accent">
           Back to leaderboard
         </Link>
       </main>
@@ -78,6 +83,7 @@ export default async function ProfilePage({
   const activities = (data ?? []) as Activity[];
   const noAccess = !hasAccess;
   const scoreResult = computeScore(activities, new Date(), timeZone);
+  const suspicion = detectSuspiciousPattern(activities, timeZone);
   const activeDates = new Set(
     activities.map((a) => formatDateKey(new Date(a.logged_at), timeZone))
   );
@@ -108,7 +114,7 @@ export default async function ProfilePage({
     <main className="min-h-dvh px-6 pb-32 pt-10">
       <div className="mx-auto max-w-md">
         <Link
-          href="/leaderboard"
+          href={backHref}
           className="inline-flex items-center gap-1 text-sm text-muted"
         >
           <ArrowLeft size={16} /> Back
@@ -158,6 +164,17 @@ export default async function ProfilePage({
               />
               <Stat label="Active/30d" value={String(scoreResult.activeDaysLast30)} />
             </div>
+
+            {suspicion.suspicious && (
+              <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
+                <Flag size={14} className="mt-0.5 shrink-0" />
+                <p>
+                  <span className="font-medium">Looks a little too consistent:</span>{" "}
+                  {suspicion.reason}. Not proof of anything — just flagged for
+                  friends to see.
+                </p>
+              </div>
+            )}
 
             <p className="mt-8 text-sm font-medium text-muted">
               Last {WEEKS} weeks

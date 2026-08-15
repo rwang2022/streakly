@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser, getRequestTimeZone } from "@/lib/auth";
 import { computeScore } from "@/lib/scoring";
+import { detectSuspiciousPattern } from "@/lib/fraud";
 import type { Activity, LeaderboardEntry, Profile, Room } from "@/lib/types";
 
 type ScoringActivity = Pick<Activity, "user_id" | "logged_at" | "duration_minutes">;
@@ -77,11 +78,9 @@ export async function getLeaderboard(roomId?: string): Promise<{
 
   const entries: LeaderboardEntry[] = ((profiles ?? []) as Profile[]).map(
     (profile) => {
-      const result = computeScore(
-        activitiesByUser.get(profile.id) ?? [],
-        new Date(),
-        timeZone
-      );
+      const userActivities = activitiesByUser.get(profile.id) ?? [];
+      const result = computeScore(userActivities, new Date(), timeZone);
+      const suspicion = detectSuspiciousPattern(userActivities, timeZone);
       return {
         profile,
         score: result.score,
@@ -92,6 +91,8 @@ export async function getLeaderboard(roomId?: string): Promise<{
         isSlacking: result.isSlacking,
         isMe: profile.id === user.id,
         lastActiveDate: result.lastActiveDate,
+        isSuspicious: suspicion.suspicious,
+        suspicionReason: suspicion.reason,
       };
     }
   );
