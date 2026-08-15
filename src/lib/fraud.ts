@@ -10,10 +10,12 @@ const SUSPICIOUS_DAY_RUN_LENGTH = 5;
 
 // The other obvious tell: someone sitting there mashing "Log Activity"
 // over and over to backfill a bunch of entries in one sitting. Real
-// logging is spread out over the day/week; a burst of entries created
-// seconds apart from each other is not.
-const BURST_GAP_MS = 5 * 60 * 1000; // entries within 5 min of each other...
-const BURST_RUN_LENGTH = 10; // ...10+ in a row counts as a burst
+// logging is spread out over the day/week; a pile of entries all created
+// within the same short window is not. Uses a sliding window (not "every
+// consecutive gap must be small") so one slightly longer pause mid-burst
+// — stopping to read a screen, say — doesn't let someone dodge the flag.
+const BURST_WINDOW_MS = 20 * 60 * 1000; // any 20-minute window...
+const BURST_MIN_COUNT = 6; // ...containing 6+ entries counts as a burst
 
 export interface SuspicionResult {
   suspicious: boolean;
@@ -51,26 +53,28 @@ export function detectSuspiciousPattern(
 }
 
 function detectBurst(activities: SuspicionActivity[]): SuspicionResult {
-  const sorted = [...activities].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  );
-  if (sorted.length === 0) return { suspicious: false, reason: null };
+  const times = activities
+    .map((a) => new Date(a.created_at).getTime())
+    .sort((a, b) => a - b);
+  if (times.length === 0) return { suspicious: false, reason: null };
 
-  let bestRun = 1;
-  let curRun = 1;
-
-  for (let i = 1; i < sorted.length; i++) {
-    const gap =
-      new Date(sorted[i].created_at).getTime() -
-      new Date(sorted[i - 1].created_at).getTime();
-    curRun = gap <= BURST_GAP_MS ? curRun + 1 : 1;
-    bestRun = Math.max(bestRun, curRun);
+  // Sliding window over sorted timestamps: for each right edge, shrink the
+  // left edge until the window fits within BURST_WINDOW_MS, then check
+  // how many entries are inside it.
+  let left = 0;
+  let bestCount = 1;
+  for (let right = 0; right < times.length; right++) {
+    while (times[right] - times[left] > BURST_WINDOW_MS) {
+      left += 1;
+    }
+    bestCount = Math.max(bestCount, right - left + 1);
   }
 
-  if (bestRun >= BURST_RUN_LENGTH) {
+  if (bestCount >= BURST_MIN_COUNT) {
+    const windowMinutes = Math.round(BURST_WINDOW_MS / 60000);
     return {
       suspicious: true,
-      reason: `${bestRun} activities logged within minutes of each other`,
+      reason: `${bestCount} activities logged within a ${windowMinutes}-minute span`,
     };
   }
 
