@@ -63,6 +63,11 @@ create policy "users can create rooms"
   to authenticated
   with check (auth.uid() = created_by);
 
+create policy "creator can delete their room"
+  on public.rooms for delete
+  to authenticated
+  using (auth.uid() = created_by);
+
 -- Memberships: visible to other members of the same room (so the app can
 -- render room rosters/leaderboards), and to the user's own rows.
 create policy "memberships visible to roommates"

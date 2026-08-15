@@ -126,3 +126,26 @@ indistinguishable from the room not existing. This opens read access to
 room name/id (not membership or activity data) to anyone, which is what a
 join-by-link flow needs.
 
+## Migration 4: leave/delete rooms
+
+Adds the missing DELETE policy so a room's creator can delete it (leaving,
+for non-creators, already worked via the existing membership policy). Run
+`supabase/migration_4_room_delete.sql` if you're on an existing deployment.
+
+## What's new in this pass
+
+- **Leave / delete rooms** from the Rooms page — non-creators get "Leave
+  room," the creator gets "Delete room" (tap twice to confirm either).
+- **Score-tier badges** replace the old top-3-only medals — every row gets
+  a small badge (🐐 GOAT, 🔥 Locked in, 💪 Grinding, 🌱 Getting there, 😅
+  Rusty) based on their own score, not just their rank.
+- **Slacking is louder** — inactive (3+ days) rows get a distinct amber
+  tint, a faded avatar, and a 👻 MIA badge instead of quietly greyed-out
+  text.
+- **Bottom nav fixed on iOS** — added `viewport-fit=cover` so the safe-area
+  inset actually resolves, plus extra padding so the nav isn't flush
+  against the home indicator.
+- **Faster-feeling navigation** — added skeleton loading states for
+  Dashboard, Leaderboard, History, and Profile so switching screens shows
+  something instantly instead of a blank flash.
+

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Copy, Check, Plus, DoorOpen, Users } from "lucide-react";
+import { ArrowLeft, Copy, Check, Plus, DoorOpen, Users, LogOut, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { generateInviteCode } from "@/lib/inviteCode";
 import { BottomNav } from "@/components/BottomNav";
@@ -19,6 +19,8 @@ export default function RoomsPage() {
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   async function loadRooms(uid: string) {
     const { data: memberships } = await supabase
@@ -57,6 +59,13 @@ export default function RoomsPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Reset a pending confirm after a few seconds so it doesn't linger forever.
+  useEffect(() => {
+    if (!confirmingId) return;
+    const t = setTimeout(() => setConfirmingId(null), 4000);
+    return () => clearTimeout(t);
+  }, [confirmingId]);
 
   async function createRoom(e: React.FormEvent) {
     e.preventDefault();
@@ -105,7 +114,7 @@ export default function RoomsPage() {
       .from("rooms")
       .select("*")
       .eq("invite_code", code)
-      .single();
+      .maybeSingle();
 
     if (!room) {
       setError("No room found for that code.");
@@ -129,8 +138,38 @@ export default function RoomsPage() {
     });
   }
 
+  async function leaveRoom(room: Room) {
+    if (!myId) return;
+    if (confirmingId !== room.id) {
+      setConfirmingId(room.id);
+      return;
+    }
+    setBusyId(room.id);
+    await supabase
+      .from("room_memberships")
+      .delete()
+      .eq("room_id", room.id)
+      .eq("user_id", myId);
+    setConfirmingId(null);
+    setBusyId(null);
+    await loadRooms(myId);
+  }
+
+  async function deleteRoom(room: Room) {
+    if (!myId) return;
+    if (confirmingId !== room.id) {
+      setConfirmingId(room.id);
+      return;
+    }
+    setBusyId(room.id);
+    await supabase.from("rooms").delete().eq("id", room.id);
+    setConfirmingId(null);
+    setBusyId(null);
+    await loadRooms(myId);
+  }
+
   return (
-    <main className="min-h-dvh px-6 pb-28 pt-10">
+    <main className="min-h-dvh px-6 pb-32 pt-10">
       <div className="mx-auto max-w-md">
         <Link
           href="/leaderboard"
@@ -151,41 +190,67 @@ export default function RoomsPage() {
               You haven&apos;t joined any rooms yet.
             </p>
           )}
-          {rooms.map((room) => (
-            <div
-              key={room.id}
-              className="rounded-2xl border border-border bg-surface px-4 py-3.5"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users size={16} className="text-muted" />
-                  <p className="font-medium">{room.name}</p>
+          {rooms.map((room) => {
+            const isOwner = room.created_by === myId;
+            const confirming = confirmingId === room.id;
+            const busy = busyId === room.id;
+            return (
+              <div
+                key={room.id}
+                className="rounded-2xl border border-border bg-surface px-4 py-3.5 transition active:scale-[0.99]"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users size={16} className="text-muted" />
+                    <p className="font-medium">{room.name}</p>
+                  </div>
+                  <span className="text-xs text-muted">
+                    {room.memberCount} member{room.memberCount === 1 ? "" : "s"}
+                  </span>
                 </div>
-                <span className="text-xs text-muted">
-                  {room.memberCount} member{room.memberCount === 1 ? "" : "s"}
-                </span>
-              </div>
-              <div className="mt-2 flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2">
-                <span className="font-mono text-sm tracking-widest">
-                  {room.invite_code}
-                </span>
+                <div className="mt-2 flex items-center justify-between rounded-xl bg-surface-2 px-3 py-2">
+                  <span className="font-mono text-sm tracking-widest">
+                    {room.invite_code}
+                  </span>
+                  <button
+                    onClick={() => copyLink(room)}
+                    className="flex items-center gap-1 text-xs font-medium text-accent"
+                  >
+                    {copiedId === room.id ? (
+                      <>
+                        <Check size={14} /> Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} /> Copy invite link
+                      </>
+                    )}
+                  </button>
+                </div>
+
                 <button
-                  onClick={() => copyLink(room)}
-                  className="flex items-center gap-1 text-xs font-medium text-accent"
+                  onClick={() => (isOwner ? deleteRoom(room) : leaveRoom(room))}
+                  disabled={busy}
+                  className={`mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium transition ${
+                    confirming
+                      ? "bg-accent text-white"
+                      : "text-muted hover:bg-surface-2"
+                  }`}
                 >
-                  {copiedId === room.id ? (
-                    <>
-                      <Check size={14} /> Copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy size={14} /> Copy invite link
-                    </>
-                  )}
+                  {isOwner ? <Trash2 size={13} /> : <LogOut size={13} />}
+                  {busy
+                    ? "Working…"
+                    : confirming
+                    ? isOwner
+                      ? "Tap again to delete for everyone"
+                      : "Tap again to confirm leaving"
+                    : isOwner
+                    ? "Delete room"
+                    : "Leave room"}
                 </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <form onSubmit={createRoom} className="mt-8">
@@ -200,7 +265,7 @@ export default function RoomsPage() {
             <button
               type="submit"
               disabled={creating || newRoomName.trim().length < 2}
-              className="flex shrink-0 items-center gap-1 rounded-2xl bg-foreground px-4 py-3 text-sm font-medium text-background disabled:opacity-40"
+              className="flex shrink-0 items-center gap-1 rounded-2xl bg-foreground px-4 py-3 text-sm font-medium text-background transition active:scale-[0.97] disabled:opacity-40"
             >
               <Plus size={16} /> Create
             </button>
@@ -219,7 +284,7 @@ export default function RoomsPage() {
             <button
               type="submit"
               disabled={joining || joinCode.trim().length < 4}
-              className="flex shrink-0 items-center gap-1 rounded-2xl bg-foreground px-4 py-3 text-sm font-medium text-background disabled:opacity-40"
+              className="flex shrink-0 items-center gap-1 rounded-2xl bg-foreground px-4 py-3 text-sm font-medium text-background transition active:scale-[0.97] disabled:opacity-40"
             >
               <DoorOpen size={16} /> Join
             </button>

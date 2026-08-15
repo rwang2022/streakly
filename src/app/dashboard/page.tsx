@@ -3,6 +3,7 @@ import { Flame, Plus } from "lucide-react";
 import { getLeaderboard } from "@/lib/leaderboard";
 import { ScoreRing } from "@/components/ScoreRing";
 import { BottomNav } from "@/components/BottomNav";
+import { getBadge } from "@/lib/badges";
 
 export default async function DashboardPage() {
   const { entries, me } = await getLeaderboard();
@@ -10,7 +11,7 @@ export default async function DashboardPage() {
   const rank = mine ? entries.findIndex((e) => e.isMe) + 1 : null;
 
   return (
-    <main className="min-h-dvh px-6 pb-28 pt-10">
+    <main className="min-h-dvh px-6 pb-32 pt-10">
       <div className="mx-auto max-w-md">
         <p className="text-sm text-muted">Welcome back</p>
         <h1 className="text-2xl font-semibold tracking-tight">
@@ -19,6 +20,18 @@ export default async function DashboardPage() {
 
         <div className="mt-8 flex flex-col items-center rounded-3xl border border-border bg-surface p-8 shadow-sm">
           <ScoreRing score={mine?.score ?? 0} />
+
+          {mine && (
+            <span
+              className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                mine.isSlacking
+                  ? "bg-accent-2/15 text-accent-2"
+                  : "bg-surface-2 text-muted"
+              }`}
+            >
+              {getBadge(mine).emoji} {getBadge(mine).label}
+            </span>
+          )}
 
           <div className="mt-6 grid w-full grid-cols-2 gap-3">
             <Stat
@@ -42,9 +55,12 @@ export default async function DashboardPage() {
         </Link>
 
         {mine?.isSlacking && (
-          <p className="mt-4 text-center text-sm text-muted">
-            No activity in a few days — your streak is waiting on you.
-          </p>
+          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-accent-2/30 bg-accent-2/10 px-4 py-3">
+            <span className="text-lg">👻</span>
+            <p className="text-sm font-medium text-accent-2">
+              No activity in 3+ days — your streak is waiting on you.
+            </p>
+          </div>
         )}
       </div>
       <BottomNav />

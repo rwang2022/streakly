@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Flame, Dumbbell, Mountain, PersonStanding, Zap, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { computeScore } from "@/lib/scoring";
+import { getBadge } from "@/lib/badges";
 import { BottomNav } from "@/components/BottomNav";
 import type { Activity } from "@/lib/types";
 import { daysAgoIso } from "@/lib/date";
@@ -86,7 +87,7 @@ export default async function ProfilePage({
   }
 
   return (
-    <main className="min-h-dvh px-6 pb-28 pt-10">
+    <main className="min-h-dvh px-6 pb-32 pt-10">
       <div className="mx-auto max-w-md">
         <Link
           href="/leaderboard"
@@ -118,7 +119,19 @@ export default async function ProfilePage({
           </p>
         ) : (
           <>
-            <div className="mt-6 grid grid-cols-3 gap-3">
+            <div className="mt-6 flex items-center justify-center">
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                  scoreResult.isSlacking
+                    ? "bg-accent-2/15 text-accent-2"
+                    : "bg-surface-2 text-muted"
+                }`}
+              >
+                {getBadge(scoreResult).emoji} {getBadge(scoreResult).label}
+              </span>
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-3">
               <Stat label="Score" value={String(scoreResult.score)} />
               <Stat
                 label="Streak"

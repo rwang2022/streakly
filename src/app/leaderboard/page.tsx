@@ -3,6 +3,7 @@ import { Flame, Settings2 } from "lucide-react";
 import { getLeaderboard, getMyRooms } from "@/lib/leaderboard";
 import { BottomNav } from "@/components/BottomNav";
 import { ScoreInfo } from "@/components/ScoreInfo";
+import { getBadge } from "@/lib/badges";
 import type { LeaderboardEntry } from "@/lib/types";
 
 export default async function LeaderboardPage({
@@ -19,7 +20,7 @@ export default async function LeaderboardPage({
   const activeRoom = roomId ? rooms.find((r) => r.id === roomId) : null;
 
   return (
-    <main className="min-h-dvh px-6 pb-28 pt-10">
+    <main className="min-h-dvh px-6 pb-32 pt-10">
       <div className="mx-auto max-w-md">
         <div className="flex items-start justify-between">
           <div>
@@ -87,38 +88,46 @@ export default async function LeaderboardPage({
 }
 
 function Row({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
-  const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
+  const badge = getBadge(entry);
 
   const inner = (
     <div
-      className={`flex items-center gap-3 rounded-2xl border px-4 py-3.5 transition ${
-        entry.isMe
+      className={`flex items-center gap-3 rounded-2xl border px-4 py-3.5 transition active:scale-[0.99] ${
+        entry.isSlacking
+          ? "border-accent-2/30 bg-accent-2/5"
+          : entry.isMe
           ? "border-accent/40 bg-accent/5"
           : "border-border bg-surface active:bg-surface-2"
       }`}
     >
-      <div className="flex w-7 shrink-0 items-center justify-center text-sm font-medium text-muted">
-        {medal ?? rank}
+      <div className="flex w-6 shrink-0 items-center justify-center text-sm font-medium text-muted">
+        {rank}
       </div>
 
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-2 text-sm font-semibold">
+      <div
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-2 text-sm font-semibold ${
+          entry.isSlacking ? "opacity-50 grayscale" : ""
+        }`}
+      >
         {(entry.profile.display_name ?? entry.profile.username ?? "?")
           .charAt(0)
           .toUpperCase()}
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">
-          {entry.profile.display_name ?? `@${entry.profile.username}`}
-          {entry.isMe && <span className="ml-1.5 text-xs text-muted">(you)</span>}
-        </p>
+        <div className="flex items-center gap-1.5">
+          <p className="truncate font-medium">
+            {entry.profile.display_name ?? `@${entry.profile.username}`}
+            {entry.isMe && <span className="ml-1 text-xs text-muted">(you)</span>}
+          </p>
+        </div>
         <p
-          className={`flex items-center gap-1 text-xs ${
-            entry.isSlacking ? "text-slack" : "text-muted"
+          className={`mt-0.5 flex items-center gap-1 text-xs ${
+            entry.isSlacking ? "font-medium text-accent-2" : "text-muted"
           }`}
         >
           {entry.isSlacking ? (
-            "Slacking — no activity in 3+ days"
+            "No activity in 3+ days"
           ) : (
             <>
               {entry.currentStreak > 0 && (
@@ -131,12 +140,23 @@ function Row({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
         </p>
       </div>
 
-      <div className="flex shrink-0 flex-col items-end">
-        <span className="text-lg font-semibold leading-none">
-          {entry.score}
-        </span>
-        <span className="mt-0.5 text-[10px] uppercase tracking-wide text-muted">
-          score
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <div className="flex flex-col items-end">
+          <span className="text-lg font-semibold leading-none">
+            {entry.score}
+          </span>
+          <span className="mt-0.5 text-[10px] uppercase tracking-wide text-muted">
+            score
+          </span>
+        </div>
+        <span
+          className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium ${
+            entry.isSlacking
+              ? "bg-accent-2/15 text-accent-2"
+              : "bg-surface-2 text-muted"
+          }`}
+        >
+          {badge.emoji} {badge.label}
         </span>
       </div>
     </div>

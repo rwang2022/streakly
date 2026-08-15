@@ -34,7 +34,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="min-h-dvh px-6 pb-28 pt-10">
+    <main className="min-h-dvh px-6 pb-32 pt-10">
       <div className="mx-auto max-w-md">
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
 
