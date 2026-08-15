@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Shield } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, LogOut, Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -37,7 +38,14 @@ export default function SettingsPage() {
   return (
     <main className="min-h-dvh px-6 pb-32 pt-10">
       <div className="mx-auto max-w-md">
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-1 text-sm text-muted"
+        >
+          <ArrowLeft size={16} /> Back
+        </Link>
+
+        <h1 className="mt-4 text-2xl font-semibold tracking-tight">Settings</h1>
 
         <div className="mt-6 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-2 text-lg font-semibold">

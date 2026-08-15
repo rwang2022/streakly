@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flame, Plus } from "lucide-react";
+import { Flame, Plus, Settings } from "lucide-react";
 import { getLeaderboard } from "@/lib/leaderboard";
 import { ScoreRing } from "@/components/ScoreRing";
 import { BottomNav } from "@/components/BottomNav";
@@ -13,10 +13,21 @@ export default async function DashboardPage() {
   return (
     <main className="min-h-dvh px-6 pb-32 pt-10">
       <div className="mx-auto max-w-md">
-        <p className="text-sm text-muted">Welcome back</p>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {me?.display_name ?? `@${me?.username ?? ""}`}
-        </h1>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-sm text-muted">Welcome back</p>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {me?.display_name ?? `@${me?.username ?? ""}`}
+            </h1>
+          </div>
+          <Link
+            href="/settings"
+            aria-label="Settings"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-muted transition active:scale-95"
+          >
+            <Settings size={16} />
+          </Link>
+        </div>
 
         <div className="mt-8 flex flex-col items-center rounded-3xl border border-border bg-surface p-8 shadow-sm">
           <ScoreRing score={mine?.score ?? 0} />
