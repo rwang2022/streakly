@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/auth";
 import { BottomNav } from "@/components/BottomNav";
 import type { Activity } from "@/lib/types";
 import { daysAgoIso } from "@/lib/date";
@@ -23,7 +24,7 @@ export default async function HistoryPage() {
   const supabase = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getCachedUser();
   if (!user) return null;
 
   const since = daysAgoIso(WEEKS * 7);

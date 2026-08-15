@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, Flame, Dumbbell, Mountain, PersonStanding, Zap, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/auth";
 import { computeScore } from "@/lib/scoring";
 import { getBadge } from "@/lib/badges";
 import { BottomNav } from "@/components/BottomNav";
@@ -32,7 +33,7 @@ export default async function ProfilePage({
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getCachedUser();
 
   const { data: profile } = await supabase
     .from("profiles")

@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/auth";
 import { computeScore } from "@/lib/scoring";
 import type { Activity, LeaderboardEntry, Profile, Room } from "@/lib/types";
 
@@ -15,7 +16,7 @@ export async function getLeaderboard(roomId?: string): Promise<{
   const supabase = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getCachedUser();
 
   if (!user) return { entries: [], me: null };
 
@@ -89,7 +90,7 @@ export async function getMyRooms(): Promise<Room[]> {
   const supabase = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await getCachedUser();
   if (!user) return [];
 
   const { data: memberships } = await supabase

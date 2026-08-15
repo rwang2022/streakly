@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { LogOut, Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import type { Profile } from "@/lib/types";
 
 export default function SettingsPage() {
@@ -50,6 +51,10 @@ export default function SettingsPage() {
               @{profile?.username ?? "loading"}
             </p>
           </div>
+        </div>
+
+        <div className="mt-6">
+          <ThemeToggle />
         </div>
 
         <div className="mt-6 flex items-start gap-3 rounded-2xl border border-border bg-surface px-4 py-4">

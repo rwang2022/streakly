@@ -41,7 +41,7 @@ export default function LogActivityPage() {
 
     setSaving(false);
     setSaved(true);
-    setTimeout(() => router.push("/dashboard"), 700);
+    setTimeout(() => router.push("/dashboard"), 450);
   }
 
   return (

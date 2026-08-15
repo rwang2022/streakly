@@ -11,21 +11,24 @@
   --accent-2: #ff9f0a;
   --success: #30d158;
   --slack: #a1a1a6;
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #000000;
-    --surface: #1c1c1e;
-    --surface-2: #2c2c2e;
-    --foreground: #f5f5f7;
-    --muted: #98989d;
-    --border: #38383a;
-    --accent: #ff453a;
-    --accent-2: #ff9f0a;
-    --success: #32d74b;
-    --slack: #636366;
-  }
+/* Explicit dark theme, toggled via a `.dark` class on <html>. Applied by an
+   inline script in the document head (before first paint) based on saved
+   preference or system setting, so there's no flash of the wrong theme. */
+.dark {
+  --background: #000000;
+  --surface: #1c1c1e;
+  --surface-2: #2c2c2e;
+  --foreground: #f5f5f7;
+  --muted: #98989d;
+  --border: #38383a;
+  --accent: #ff453a;
+  --accent-2: #ff9f0a;
+  --success: #32d74b;
+  --slack: #636366;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -51,4 +54,11 @@ body {
 
 * {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Skip transitions on first paint so the theme doesn't visibly animate in;
+   re-enabled after load so the manual toggle still feels smooth. */
+.theme-transition-ready body,
+.theme-transition-ready * {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
