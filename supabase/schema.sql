@@ -179,9 +179,9 @@ alter table public.room_memberships enable row level security;
 -- Rooms: readable by any authenticated user (needed so a join-by-code page
 -- can preview the room name before the user has joined). Nothing sensitive
 -- lives on this table.
-create policy "rooms are readable by authenticated users"
+create policy "rooms are readable by anyone"
   on public.rooms for select
-  to authenticated
+  to public
   using (true);
 
 create policy "users can create rooms"

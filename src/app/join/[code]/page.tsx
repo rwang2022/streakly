@@ -6,7 +6,7 @@ import { Users, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Room } from "@/lib/types";
 
-type Status = "loading" | "not-found" | "signed-out" | "needs-username" | "ready" | "joined";
+type Status = "loading" | "not-found" | "error" | "signed-out" | "needs-username" | "ready" | "joined";
 
 export default function JoinRoomPage({
   params,
@@ -17,18 +17,25 @@ export default function JoinRoomPage({
   const router = useRouter();
   const [status, setStatus] = useState<Status>("loading");
   const [room, setRoom] = useState<Room | null>(null);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       const supabase = createClient();
       const normalized = decodeURIComponent(code).toUpperCase();
 
-      const { data: roomRow } = await supabase
+      const { data: roomRow, error: roomError } = await supabase
         .from("rooms")
         .select("*")
         .eq("invite_code", normalized)
-        .single();
+        .maybeSingle();
 
+      if (roomError) {
+        console.error("join lookup failed:", roomError);
+        setErrorDetail(`${roomError.code ?? ""} ${roomError.message ?? ""}`.trim());
+        setStatus("error");
+        return;
+      }
       if (!roomRow) {
         setStatus("not-found");
         return;
@@ -93,6 +100,21 @@ export default function JoinRoomPage({
               This room code doesn&apos;t look right. Double-check the link
               with whoever sent it.
             </p>
+          </>
+        )}
+
+        {status === "error" && (
+          <>
+            <h1 className="text-xl font-semibold">Couldn&apos;t load this invite</h1>
+            <p className="mt-2 text-sm text-muted">
+              Something went wrong reaching the server. Try again in a
+              moment.
+            </p>
+            {errorDetail && (
+              <p className="mt-3 rounded-xl bg-surface-2 px-3 py-2 text-left font-mono text-[11px] text-muted">
+                {errorDetail}
+              </p>
+            )}
           </>
         )}
 

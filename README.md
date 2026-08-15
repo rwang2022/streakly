@@ -115,3 +115,14 @@ New here:
 - Leaderboard rows now clearly label the score vs. the streak, and there's
   an (i) icon that explains the scoring formula on hover/tap.
 
+## Migration 3: fix room lookup for signed-out visitors
+
+If you already ran migration 2 and hit "Invite not found" on a join link
+that should work (especially the very first time someone opens it before
+signing in), run `supabase/migration_3_public_room_lookup.sql`. The original
+policy only let logged-in requests read the `rooms` table, so a fresh
+(signed-out) tap on a join link was silently shown zero rows by RLS —
+indistinguishable from the room not existing. This opens read access to
+room name/id (not membership or activity data) to anyone, which is what a
+join-by-link flow needs.
+
