@@ -74,6 +74,7 @@ export async function getLeaderboard(roomId?: string): Promise<{
         activeDaysLast30: result.activeDaysLast30,
         isSlacking: result.isSlacking,
         isMe: profile.id === user.id,
+        lastActiveDate: result.lastActiveDate,
       };
     }
   );

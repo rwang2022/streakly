@@ -53,15 +53,33 @@ export default async function ProfilePage({
   }
 
   const since = daysAgoIso(WEEKS * 7);
-  const { data } = await supabase
-    .from("activities")
-    .select("*")
-    .eq("user_id", id)
-    .gte("logged_at", since)
-    .order("logged_at", { ascending: false });
+  const isSelf = user?.id === id;
+
+  // Whether we're even allowed to see this person's activity is a real
+  // relationship check (friends or shared room), not something you can
+  // infer from an empty activities array — someone you're genuinely
+  // friends with might just not have logged anything yet, which looks
+  // identical to "blocked by RLS" if you only look at row count.
+  let hasAccess = isSelf;
+  if (!isSelf && user) {
+    const [{ data: isFriend }, { data: sharesRoom }] = await Promise.all([
+      supabase.rpc("is_friend", { a: user.id, b: id }),
+      supabase.rpc("share_room", { a: user.id, b: id }),
+    ]);
+    hasAccess = Boolean(isFriend) || Boolean(sharesRoom);
+  }
+
+  const { data } = hasAccess
+    ? await supabase
+        .from("activities")
+        .select("*")
+        .eq("user_id", id)
+        .gte("logged_at", since)
+        .order("logged_at", { ascending: false })
+    : { data: [] as Activity[] };
 
   const activities = (data ?? []) as Activity[];
-  const noAccess = activities.length === 0 && user?.id !== id;
+  const noAccess = !hasAccess;
   const scoreResult = computeScore(activities);
   const activeDates = new Set(activities.map((a) => dateKey(a.logged_at)));
 

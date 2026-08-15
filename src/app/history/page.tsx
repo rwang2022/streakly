@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser } from "@/lib/auth";
 import { BottomNav } from "@/components/BottomNav";
+import { DeleteActivityButton } from "@/components/DeleteActivityButton";
 import type { Activity } from "@/lib/types";
 import { daysAgoIso } from "@/lib/date";
 import { Dumbbell, Mountain, PersonStanding, Zap, Sparkles } from "lucide-react";
@@ -110,6 +111,7 @@ export default async function HistoryPage() {
                   {a.note ? ` · ${a.note}` : ""}
                 </p>
               </div>
+              <DeleteActivityButton activityId={a.id} />
             </div>
           ))}
         </div>

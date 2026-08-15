@@ -55,10 +55,10 @@ export default async function DashboardPage() {
         </Link>
 
         {mine?.isSlacking && (
-          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-accent-2/30 bg-accent-2/10 px-4 py-3">
-            <span className="text-lg">👻</span>
+          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-dashed border-accent-2/40 bg-accent-2/10 px-4 py-3">
+            <span className="text-lg">🪦</span>
             <p className="text-sm font-medium text-accent-2">
-              No activity in 3+ days — your streak is waiting on you.
+              RIP your streak. It died of neglect. Log something to resurrect it.
             </p>
           </div>
         )}

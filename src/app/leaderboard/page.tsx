@@ -1,10 +1,18 @@
 import Link from "next/link";
-import { Flame, Settings2 } from "lucide-react";
+import { Flame, Settings2, Skull } from "lucide-react";
 import { getLeaderboard, getMyRooms } from "@/lib/leaderboard";
 import { BottomNav } from "@/components/BottomNav";
 import { ScoreInfo } from "@/components/ScoreInfo";
 import { getBadge } from "@/lib/badges";
 import type { LeaderboardEntry } from "@/lib/types";
+
+const DAY_MS = 86400000;
+
+function daysSinceLastActive(lastActiveDate: string | null): number | null {
+  if (!lastActiveDate) return null;
+  const last = new Date(lastActiveDate + "T00:00:00Z").getTime();
+  return Math.floor((Date.now() - last) / DAY_MS);
+}
 
 export default async function LeaderboardPage({
   searchParams,
@@ -89,12 +97,22 @@ export default async function LeaderboardPage({
 
 function Row({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
   const badge = getBadge(entry);
+  const daysSince = daysSinceLastActive(entry.lastActiveDate);
+
+  let slackerLine: string;
+  if (daysSince === null) {
+    slackerLine = "Never logged a single rep";
+  } else if (daysSince >= 14) {
+    slackerLine = `Missing for ${daysSince} days. Presumed hibernating.`;
+  } else {
+    slackerLine = `Last seen ${daysSince}d ago`;
+  }
 
   const inner = (
     <div
-      className={`flex items-center gap-3 rounded-2xl border px-4 py-3.5 transition active:scale-[0.99] ${
+      className={`flex items-center gap-3 rounded-2xl border px-4 py-4 transition active:scale-[0.99] ${
         entry.isSlacking
-          ? "border-accent-2/30 bg-accent-2/5"
+          ? "border-dashed border-accent-2/40 bg-accent-2/10"
           : entry.isMe
           ? "border-accent/40 bg-accent/5"
           : "border-border bg-surface active:bg-surface-2"
@@ -106,7 +124,7 @@ function Row({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
 
       <div
         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-2 text-sm font-semibold ${
-          entry.isSlacking ? "opacity-50 grayscale" : ""
+          entry.isSlacking ? "opacity-40 grayscale" : ""
         }`}
       >
         {(entry.profile.display_name ?? entry.profile.username ?? "?")
@@ -116,18 +134,25 @@ function Row({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <p className="truncate font-medium">
+          <p
+            className={`truncate font-medium ${
+              entry.isSlacking ? "text-muted line-through decoration-accent-2/50" : ""
+            }`}
+          >
             {entry.profile.display_name ?? `@${entry.profile.username}`}
             {entry.isMe && <span className="ml-1 text-xs text-muted">(you)</span>}
           </p>
         </div>
         <p
           className={`mt-0.5 flex items-center gap-1 text-xs ${
-            entry.isSlacking ? "font-medium text-accent-2" : "text-muted"
+            entry.isSlacking ? "font-semibold text-accent-2" : "text-muted"
           }`}
         >
           {entry.isSlacking ? (
-            "No activity in 3+ days"
+            <>
+              <Skull size={11} className="shrink-0" />
+              {slackerLine}
+            </>
           ) : (
             <>
               {entry.currentStreak > 0 && (
@@ -140,19 +165,19 @@ function Row({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
         </p>
       </div>
 
-      <div className="flex shrink-0 flex-col items-end gap-1">
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
         <div className="flex flex-col items-end">
           <span className="text-lg font-semibold leading-none">
             {entry.score}
           </span>
-          <span className="mt-0.5 text-[10px] uppercase tracking-wide text-muted">
+          <span className="mt-1 text-[10px] uppercase tracking-wide text-muted">
             score
           </span>
         </div>
         <span
           className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium ${
             entry.isSlacking
-              ? "bg-accent-2/15 text-accent-2"
+              ? "bg-accent-2/20 text-accent-2"
               : "bg-surface-2 text-muted"
           }`}
         >

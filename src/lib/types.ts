@@ -38,6 +38,7 @@ export interface LeaderboardEntry {
   activeDaysLast30: number;
   isSlacking: boolean;
   isMe: boolean;
+  lastActiveDate: string | null;
 }
 
 export interface Room {
