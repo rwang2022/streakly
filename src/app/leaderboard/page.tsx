@@ -124,6 +124,7 @@ function Row({
 }) {
   const badge = getBadge(entry);
   const daysSince = daysSinceLastActive(entry.lastActiveDate, todayKey);
+  const isBusted = entry.isSuspicious;
 
   let slackerLine: string;
   if (daysSince === null) {
@@ -137,7 +138,9 @@ function Row({
   const inner = (
     <div
       className={`flex items-center gap-3 rounded-2xl border px-4 py-4 transition active:scale-[0.99] ${
-        entry.isSlacking
+        isBusted
+          ? "border-dashed border-amber-500/50 bg-amber-500/10"
+          : entry.isSlacking
           ? "border-dashed border-accent-2/40 bg-accent-2/10"
           : entry.isMe
           ? "border-accent/40 bg-accent/5"
@@ -150,7 +153,7 @@ function Row({
 
       <div
         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-2 text-sm font-semibold ${
-          entry.isSlacking ? "opacity-40 grayscale" : ""
+          isBusted || entry.isSlacking ? "opacity-40 grayscale" : ""
         }`}
       >
         {(entry.profile.display_name ?? entry.profile.username ?? "?")
@@ -162,27 +165,31 @@ function Row({
         <div className="flex items-center gap-1.5">
           <p
             className={`truncate font-medium ${
-              entry.isSlacking ? "text-muted line-through decoration-accent-2/50" : ""
+              entry.isSlacking && !isBusted
+                ? "text-muted line-through decoration-accent-2/50"
+                : ""
             }`}
           >
             {entry.profile.display_name ?? `@${entry.profile.username}`}
             {entry.isMe && <span className="ml-1 text-xs text-muted">(you)</span>}
           </p>
-          {entry.isSuspicious && (
-            <span
-              title={entry.suspicionReason ?? "Looks gamed"}
-              className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
-            >
-              <Flag size={9} /> sus
-            </span>
-          )}
         </div>
         <p
+          title={isBusted ? entry.suspicionReason ?? undefined : undefined}
           className={`mt-0.5 flex items-center gap-1 text-xs ${
-            entry.isSlacking ? "font-semibold text-accent-2" : "text-muted"
+            isBusted
+              ? "font-semibold text-amber-600 dark:text-amber-400"
+              : entry.isSlacking
+              ? "font-semibold text-accent-2"
+              : "text-muted"
           }`}
         >
-          {entry.isSlacking ? (
+          {isBusted ? (
+            <>
+              <Flag size={11} className="shrink-0" />
+              Caught gaming it — score tanked
+            </>
+          ) : entry.isSlacking ? (
             <>
               <Skull size={11} className="shrink-0" />
               {slackerLine}
@@ -201,7 +208,11 @@ function Row({
 
       <div className="flex shrink-0 flex-col items-end gap-1.5">
         <div className="flex flex-col items-end">
-          <span className="text-lg font-semibold leading-none">
+          <span
+            className={`text-lg font-semibold leading-none ${
+              isBusted ? "text-amber-600 dark:text-amber-400" : ""
+            }`}
+          >
             {entry.score}
           </span>
           <span className="mt-1 text-[10px] uppercase tracking-wide text-muted">
@@ -210,7 +221,9 @@ function Row({
         </div>
         <span
           className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium ${
-            entry.isSlacking
+            isBusted
+              ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+              : entry.isSlacking
               ? "bg-accent-2/20 text-accent-2"
               : "bg-surface-2 text-muted"
           }`}

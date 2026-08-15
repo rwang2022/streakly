@@ -11,7 +11,10 @@ export interface Badge {
  * earns based on their own score, so someone in 6th with a strong score
  * still gets something fun instead of just a number.
  */
-export function getBadge(entry: Pick<LeaderboardEntry, "score" | "isSlacking">): Badge {
+export function getBadge(
+  entry: Pick<LeaderboardEntry, "score" | "isSlacking" | "isSuspicious">
+): Badge {
+  if (entry.isSuspicious) return { emoji: "🚨", label: "Busted" };
   if (entry.isSlacking) return { emoji: "🪦", label: "RIP streak" };
   if (entry.score >= 90) return { emoji: "🐐", label: "GOAT" };
   if (entry.score >= 75) return { emoji: "🔥", label: "Locked in" };

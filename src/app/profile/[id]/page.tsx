@@ -84,6 +84,11 @@ export default async function ProfilePage({
   const noAccess = !hasAccess;
   const scoreResult = computeScore(activities, new Date(), timeZone);
   const suspicion = detectSuspiciousPattern(activities, timeZone);
+  // Same flat -100 penalty applied on the leaderboard, uncapped so it can
+  // go negative — see lib/leaderboard.ts for the rationale.
+  const displayScore = suspicion.suspicious
+    ? scoreResult.score - 100
+    : scoreResult.score;
   const activeDates = new Set(
     activities.map((a) => formatDateKey(new Date(a.logged_at), timeZone))
   );
@@ -146,17 +151,20 @@ export default async function ProfilePage({
             <div className="mt-6 flex items-center justify-center">
               <span
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-                  scoreResult.isSlacking
+                  suspicion.suspicious
+                    ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                    : scoreResult.isSlacking
                     ? "bg-accent-2/15 text-accent-2"
                     : "bg-surface-2 text-muted"
                 }`}
               >
-                {getBadge(scoreResult).emoji} {getBadge(scoreResult).label}
+                {getBadge({ ...scoreResult, isSuspicious: suspicion.suspicious }).emoji}{" "}
+                {getBadge({ ...scoreResult, isSuspicious: suspicion.suspicious }).label}
               </span>
             </div>
 
             <div className="mt-3 grid grid-cols-3 gap-3">
-              <Stat label="Score" value={String(scoreResult.score)} />
+              <Stat label="Score" value={String(displayScore)} />
               <Stat
                 label="Streak"
                 value={`${scoreResult.currentStreak}d`}
@@ -169,9 +177,10 @@ export default async function ProfilePage({
               <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
                 <Flag size={14} className="mt-0.5 shrink-0" />
                 <p>
-                  <span className="font-medium">Looks a little too consistent:</span>{" "}
-                  {suspicion.reason}. Not proof of anything — just flagged for
-                  friends to see.
+                  <span className="font-medium">-100 penalty applied:</span>{" "}
+                  {suspicion.reason}. Score would&apos;ve been{" "}
+                  {scoreResult.score} — flagged patterns like this tank it
+                  instead. Not proof of anything, just a heads up to friends.
                 </p>
               </div>
             )}

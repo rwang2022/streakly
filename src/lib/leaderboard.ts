@@ -85,9 +85,14 @@ export async function getLeaderboard(roomId?: string): Promise<{
       const userActivities = activitiesByUser.get(profile.id) ?? [];
       const result = computeScore(userActivities, new Date(), timeZone);
       const suspicion = detectSuspiciousPattern(userActivities, timeZone);
+      // Flat -100 penalty, deliberately not clamped back to 0 — the whole
+      // point is it visibly wrecks your rank (drops you below everyone,
+      // even someone slacking), not just resets you to where a brand new
+      // user would start.
+      const score = suspicion.suspicious ? result.score - 100 : result.score;
       return {
         profile,
-        score: result.score,
+        score,
         consistencyPct: result.consistencyPct,
         currentStreak: result.currentStreak,
         longestStreak: result.longestStreak,
