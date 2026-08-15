@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { ArrowLeft, Flame, Dumbbell, Mountain, PersonStanding, Zap, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getCachedUser } from "@/lib/auth";
+import { getCachedUser, getRequestTimeZone } from "@/lib/auth";
 import { computeScore } from "@/lib/scoring";
 import { getBadge } from "@/lib/badges";
 import { BottomNav } from "@/components/BottomNav";
 import type { Activity } from "@/lib/types";
-import { daysAgoIso } from "@/lib/date";
+import { daysAgoIso, formatDateKey, formatDisplayDate } from "@/lib/date";
 
 const WEEKS = 12;
 const DAY_MS = 86400000;
@@ -19,10 +19,6 @@ const ICONS: Record<string, React.ReactNode> = {
   other: <Sparkles size={16} />,
 };
 
-function dateKey(iso: string) {
-  return new Date(iso).toISOString().slice(0, 10);
-}
-
 export default async function ProfilePage({
   params,
 }: {
@@ -31,9 +27,10 @@ export default async function ProfilePage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await getCachedUser();
+  const [{ data: { user } }, timeZone] = await Promise.all([
+    getCachedUser(),
+    getRequestTimeZone(),
+  ]);
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -80,11 +77,13 @@ export default async function ProfilePage({
 
   const activities = (data ?? []) as Activity[];
   const noAccess = !hasAccess;
-  const scoreResult = computeScore(activities);
-  const activeDates = new Set(activities.map((a) => dateKey(a.logged_at)));
+  const scoreResult = computeScore(activities, new Date(), timeZone);
+  const activeDates = new Set(
+    activities.map((a) => formatDateKey(new Date(a.logged_at), timeZone))
+  );
 
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+  const todayKey = formatDateKey(new Date(), timeZone);
+  const today = new Date(`${todayKey}T00:00:00Z`);
   const startOffset = today.getUTCDay();
   const gridStart = new Date(
     today.getTime() - (WEEKS * 7 - 1 + startOffset) * DAY_MS
@@ -198,10 +197,7 @@ export default async function ProfilePage({
                   <div className="min-w-0 flex-1">
                     <p className="font-medium capitalize">{a.type}</p>
                     <p className="truncate text-xs text-muted">
-                      {new Date(a.logged_at).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                      })}
+                      {formatDisplayDate(a.logged_at, timeZone)}
                       {a.duration_minutes ? ` · ${a.duration_minutes} min` : ""}
                       {a.note ? ` · ${a.note}` : ""}
                     </p>

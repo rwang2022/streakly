@@ -1,4 +1,5 @@
 import type { Activity } from "@/lib/types";
+import { formatDateKey, daysBetweenDateKeys, DEFAULT_TIMEZONE } from "@/lib/date";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CONSISTENCY_WINDOW_DAYS = 30;
@@ -18,24 +19,27 @@ export interface ScoreResult {
   lastActiveDate: string | null;
 }
 
-/** UTC date key (YYYY-MM-DD) so "a day" is consistent regardless of time-of-day logged. */
-function dateKey(iso: string): string {
-  return new Date(iso).toISOString().slice(0, 10);
-}
-
-function daysAgoKey(days: number, from: Date): string {
-  return new Date(from.getTime() - days * DAY_MS).toISOString().slice(0, 10);
+function daysAgoKey(days: number, from: Date, timeZone: string): string {
+  return formatDateKey(new Date(from.getTime() - days * DAY_MS), timeZone);
 }
 
 /**
  * Computes the consistency-weighted score for a user from their raw activity
- * log rows. Pass in activities from at least the last ~90 days for an
+ * log rows. Pass in activities from at least the last ~35 days for an
  * accurate streak; only the last 30 days count toward consistency/volume.
+ *
+ * `timeZone` is the *person's* IANA timezone (e.g. "America/New_York"), not
+ * the server's. This runs in a server component, which otherwise only
+ * knows the server's own timezone (UTC on Vercel) — without this, "today"
+ * and which calendar day an activity falls on would silently drift by a
+ * day for anyone west of UTC, especially in the evening.
  */
 export function computeScore(
   activities: Pick<Activity, "logged_at" | "duration_minutes">[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  timeZone: string = DEFAULT_TIMEZONE
 ): ScoreResult {
+  const dateKey = (iso: string) => formatDateKey(new Date(iso), timeZone);
   const activeDates = new Set(activities.map((a) => dateKey(a.logged_at)));
 
   // --- consistency + volume (last 30 days) ---
@@ -50,7 +54,7 @@ export function computeScore(
   let activeDaysLast30 = 0;
   let totalMinutesLast30 = 0;
   for (let i = 0; i < CONSISTENCY_WINDOW_DAYS; i++) {
-    const key = daysAgoKey(i, now);
+    const key = daysAgoKey(i, now, timeZone);
     if (activeDates.has(key)) {
       activeDaysLast30 += 1;
       totalMinutesLast30 += minutesByDate.get(key) ?? 0;
@@ -59,10 +63,10 @@ export function computeScore(
   const consistencyPct = (activeDaysLast30 / CONSISTENCY_WINDOW_DAYS) * 100;
 
   // --- current streak (grace: today isn't "missed" until it's over) ---
-  const startCursor = activeDates.has(daysAgoKey(0, now)) ? 0 : 1;
+  const startCursor = activeDates.has(daysAgoKey(0, now, timeZone)) ? 0 : 1;
   let currentStreak = 0;
   let cursor = startCursor;
-  while (activeDates.has(daysAgoKey(cursor, now))) {
+  while (activeDates.has(daysAgoKey(cursor, now, timeZone))) {
     currentStreak += 1;
     cursor += 1;
   }
@@ -71,16 +75,15 @@ export function computeScore(
   const sortedDates = Array.from(activeDates).sort();
   let longestStreak = 0;
   let running = 0;
-  let prev: Date | null = null;
+  let prevKey: string | null = null;
   for (const key of sortedDates) {
-    const d = new Date(key + "T00:00:00Z");
-    if (prev && d.getTime() - prev.getTime() === DAY_MS) {
+    if (prevKey && daysBetweenDateKeys(prevKey, key) === 1) {
       running += 1;
     } else {
       running = 1;
     }
     longestStreak = Math.max(longestStreak, running);
-    prev = d;
+    prevKey = key;
   }
   longestStreak = Math.max(longestStreak, currentStreak);
 
@@ -88,10 +91,10 @@ export function computeScore(
   const lastActiveDate = sortedDates.length
     ? sortedDates[sortedDates.length - 1]
     : null;
+  const todayKey = formatDateKey(now, timeZone);
   const isSlacking =
     !lastActiveDate ||
-    (now.getTime() - new Date(lastActiveDate + "T00:00:00Z").getTime()) / DAY_MS >=
-      SLACKING_THRESHOLD_DAYS;
+    daysBetweenDateKeys(lastActiveDate, todayKey) >= SLACKING_THRESHOLD_DAYS;
 
   // --- weighted score ---
   const streakComponent = Math.min(currentStreak / STREAK_CAP_DAYS, 1) * 100;

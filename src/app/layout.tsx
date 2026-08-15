@@ -45,6 +45,24 @@ const THEME_INIT_SCRIPT = `
 })();
 `;
 
+// Server components (Vercel = UTC) never know the *visiting person's*
+// timezone on their own, so day-bucketing (streaks, "today", history)
+// would silently run in UTC instead of the visitor's real calendar day.
+// This runs before first paint, reads the browser's IANA timezone, and
+// stashes it in a cookie so every subsequent server request can read it
+// via getRequestTimeZone(). Re-set on every load (cheap) so it stays
+// correct if someone travels or the OS timezone changes.
+const TIMEZONE_INIT_SCRIPT = `
+(function () {
+  try {
+    var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz) {
+      document.cookie = "streakly-tz=" + tz + "; path=/; max-age=31536000; SameSite=Lax";
+    }
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -52,6 +70,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: TIMEZONE_INIT_SCRIPT }} />
       </head>
       <body className="antialiased">
         {children}

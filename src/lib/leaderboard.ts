@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getCachedUser } from "@/lib/auth";
+import { getCachedUser, getRequestTimeZone } from "@/lib/auth";
 import { computeScore } from "@/lib/scoring";
 import type { Activity, LeaderboardEntry, Profile, Room } from "@/lib/types";
 
@@ -21,9 +21,10 @@ export async function getLeaderboard(roomId?: string): Promise<{
   me: Profile | null;
 }> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await getCachedUser();
+  const [{ data: { user } }, timeZone] = await Promise.all([
+    getCachedUser(),
+    getRequestTimeZone(),
+  ]);
 
   if (!user) return { entries: [], me: null };
 
@@ -76,7 +77,11 @@ export async function getLeaderboard(roomId?: string): Promise<{
 
   const entries: LeaderboardEntry[] = ((profiles ?? []) as Profile[]).map(
     (profile) => {
-      const result = computeScore(activitiesByUser.get(profile.id) ?? []);
+      const result = computeScore(
+        activitiesByUser.get(profile.id) ?? [],
+        new Date(),
+        timeZone
+      );
       return {
         profile,
         score: result.score,

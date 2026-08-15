@@ -4,14 +4,22 @@ import { getLeaderboard, getMyRooms } from "@/lib/leaderboard";
 import { BottomNav } from "@/components/BottomNav";
 import { ScoreInfo } from "@/components/ScoreInfo";
 import { getBadge } from "@/lib/badges";
+import { getRequestTimeZone } from "@/lib/auth";
+import { formatDateKey, daysBetweenDateKeys } from "@/lib/date";
 import type { LeaderboardEntry } from "@/lib/types";
 
-const DAY_MS = 86400000;
-
-function daysSinceLastActive(lastActiveDate: string | null): number | null {
+// lastActiveDate is already a "YYYY-MM-DD" key computed in the viewer's
+// timezone (see lib/leaderboard.ts / lib/scoring.ts), so this just diffs
+// two date keys against "today" in that same timezone — no raw millisecond
+// math against Date.now(), which was the root cause of the Aug 15 bug
+// (server runs in UTC on Vercel, so "today" there can be a day ahead of a
+// US-based visitor's actual calendar day).
+function daysSinceLastActive(
+  lastActiveDate: string | null,
+  todayKey: string
+): number | null {
   if (!lastActiveDate) return null;
-  const last = new Date(lastActiveDate + "T00:00:00Z").getTime();
-  return Math.floor((Date.now() - last) / DAY_MS);
+  return daysBetweenDateKeys(lastActiveDate, todayKey);
 }
 
 export default async function LeaderboardPage({
@@ -20,10 +28,12 @@ export default async function LeaderboardPage({
   searchParams: Promise<{ room?: string }>;
 }) {
   const { room: roomId } = await searchParams;
-  const [{ entries }, rooms] = await Promise.all([
+  const [{ entries }, rooms, timeZone] = await Promise.all([
     getLeaderboard(roomId),
     getMyRooms(),
+    getRequestTimeZone(),
   ]);
+  const todayKey = formatDateKey(new Date(), timeZone);
 
   const activeRoom = roomId ? rooms.find((r) => r.id === roomId) : null;
 
@@ -86,7 +96,12 @@ export default async function LeaderboardPage({
             </p>
           )}
           {entries.map((entry, i) => (
-            <Row key={entry.profile.id} entry={entry} rank={i + 1} />
+            <Row
+              key={entry.profile.id}
+              entry={entry}
+              rank={i + 1}
+              todayKey={todayKey}
+            />
           ))}
         </div>
       </div>
@@ -95,9 +110,17 @@ export default async function LeaderboardPage({
   );
 }
 
-function Row({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
+function Row({
+  entry,
+  rank,
+  todayKey,
+}: {
+  entry: LeaderboardEntry;
+  rank: number;
+  todayKey: string;
+}) {
   const badge = getBadge(entry);
-  const daysSince = daysSinceLastActive(entry.lastActiveDate);
+  const daysSince = daysSinceLastActive(entry.lastActiveDate, todayKey);
 
   let slackerLine: string;
   if (daysSince === null) {

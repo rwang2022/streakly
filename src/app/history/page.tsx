@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
-import { getCachedUser } from "@/lib/auth";
+import { getCachedUser, getRequestTimeZone } from "@/lib/auth";
 import { BottomNav } from "@/components/BottomNav";
 import { DeleteActivityButton } from "@/components/DeleteActivityButton";
 import type { Activity } from "@/lib/types";
-import { daysAgoIso } from "@/lib/date";
+import { daysAgoIso, formatDateKey, formatDisplayDate } from "@/lib/date";
 import { Dumbbell, Mountain, PersonStanding, Zap, Sparkles } from "lucide-react";
 
 const WEEKS = 12;
@@ -17,15 +17,12 @@ const ICONS: Record<string, React.ReactNode> = {
   other: <Sparkles size={16} />,
 };
 
-function dateKey(iso: string) {
-  return new Date(iso).toISOString().slice(0, 10);
-}
-
 export default async function HistoryPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await getCachedUser();
+  const [{ data: { user } }, timeZone] = await Promise.all([
+    getCachedUser(),
+    getRequestTimeZone(),
+  ]);
   if (!user) return null;
 
   const since = daysAgoIso(WEEKS * 7);
@@ -37,10 +34,15 @@ export default async function HistoryPage() {
     .order("logged_at", { ascending: false });
 
   const activities = (data ?? []) as Activity[];
-  const activeDates = new Set(activities.map((a) => dateKey(a.logged_at)));
+  const activeDates = new Set(
+    activities.map((a) => formatDateKey(new Date(a.logged_at), timeZone))
+  );
 
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+  // "Today" as a calendar date in the person's own timezone, then pinned to
+  // UTC-midnight purely so we can do whole-day arithmetic on it — from here
+  // on these are abstract calendar dates, not real UTC instants.
+  const todayKey = formatDateKey(new Date(), timeZone);
+  const today = new Date(`${todayKey}T00:00:00Z`);
   // Align grid to start on a Sunday.
   const startOffset = today.getUTCDay();
   const gridStart = new Date(
@@ -103,10 +105,7 @@ export default async function HistoryPage() {
               <div className="min-w-0 flex-1">
                 <p className="font-medium capitalize">{a.type}</p>
                 <p className="truncate text-xs text-muted">
-                  {new Date(a.logged_at).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {formatDisplayDate(a.logged_at, timeZone)}
                   {a.duration_minutes ? ` · ${a.duration_minutes} min` : ""}
                   {a.note ? ` · ${a.note}` : ""}
                 </p>
