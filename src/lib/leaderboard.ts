@@ -3,7 +3,14 @@ import { getCachedUser } from "@/lib/auth";
 import { computeScore } from "@/lib/scoring";
 import type { Activity, LeaderboardEntry, Profile, Room } from "@/lib/types";
 
-const LOOKBACK_DAYS = 90;
+type ScoringActivity = Pick<Activity, "user_id" | "logged_at" | "duration_minutes">;
+
+// 30 days feeds the score (consistency/volume window) plus a small buffer
+// so a streak spanning the boundary computes correctly. longestStreak isn't
+// shown anywhere in the UI, so there's no need to fetch further back just
+// for that — this cuts the typical row count fetched substantially for
+// anyone who's been logging for months.
+const LOOKBACK_DAYS = 35;
 
 /**
  * Leaderboard entries for either the caller's friends (default) or a
@@ -44,10 +51,15 @@ export async function getLeaderboard(roomId?: string): Promise<{
   }
 
   const [{ data: profiles }, { data: activities }] = await Promise.all([
-    supabase.from("profiles").select("*").in("id", memberIds),
+    supabase
+      .from("profiles")
+      .select("id, username, display_name, avatar_url, created_at")
+      .in("id", memberIds),
+    // Only the columns computeScore() actually reads — type/note/id/
+    // created_at aren't used for scoring and just add payload weight.
     supabase
       .from("activities")
-      .select("id, user_id, type, duration_minutes, note, logged_at, created_at")
+      .select("user_id, logged_at, duration_minutes")
       .in("user_id", memberIds)
       .gte(
         "logged_at",
@@ -55,8 +67,8 @@ export async function getLeaderboard(roomId?: string): Promise<{
       ),
   ]);
 
-  const activitiesByUser = new Map<string, Activity[]>();
-  for (const a of (activities ?? []) as Activity[]) {
+  const activitiesByUser = new Map<string, ScoringActivity[]>();
+  for (const a of (activities ?? []) as ScoringActivity[]) {
     const list = activitiesByUser.get(a.user_id) ?? [];
     list.push(a);
     activitiesByUser.set(a.user_id, list);
