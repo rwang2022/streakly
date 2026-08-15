@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flag, Flame, Settings2, Skull } from "lucide-react";
+import { Crown, Flag, Flame, Settings2, Skull } from "lucide-react";
 import { getLeaderboard, getMyRooms } from "@/lib/leaderboard";
 import { BottomNav } from "@/components/BottomNav";
 import { ScoreInfo } from "@/components/ScoreInfo";
@@ -125,6 +125,11 @@ function Row({
   const badge = getBadge(entry);
   const daysSince = daysSinceLastActive(entry.lastActiveDate, todayKey);
   const isBusted = entry.isSuspicious;
+  // #1 gets the glow treatment — but only if they've actually earned it.
+  // A slacking or busted account sitting at rank 1 (e.g. everyone else is
+  // also inactive) shouldn't get a celebratory glow layered on top of a
+  // dashed "you're slacking"/"busted" state.
+  const isChampion = rank === 1 && !isBusted && !entry.isSlacking;
 
   let slackerLine: string;
   if (daysSince === null) {
@@ -138,22 +143,34 @@ function Row({
   const inner = (
     <div
       className={`flex items-center gap-3 rounded-2xl border px-4 py-4 transition active:scale-[0.99] ${
+        isChampion ? "champion-row" : ""
+      } ${
         isBusted
           ? "border-dashed border-amber-500/50 bg-amber-500/10"
           : entry.isSlacking
           ? "border-dashed border-accent-2/40 bg-accent-2/10"
+          : isChampion
+          ? "border-transparent"
           : entry.isMe
           ? "border-accent/40 bg-accent/5"
           : "border-border bg-surface active:bg-surface-2"
       }`}
     >
-      <div className="flex w-6 shrink-0 items-center justify-center text-sm font-medium text-muted">
-        {rank}
+      <div
+        className={`flex w-6 shrink-0 items-center justify-center text-sm font-medium ${
+          isChampion ? "text-amber-500" : "text-muted"
+        }`}
+      >
+        {isChampion ? <Crown size={16} className="fill-amber-400 text-amber-500" /> : rank}
       </div>
 
       <div
-        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-2 text-sm font-semibold ${
-          isBusted || entry.isSlacking ? "opacity-40 grayscale" : ""
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
+          isBusted || entry.isSlacking
+            ? "bg-surface-2 opacity-40 grayscale"
+            : isChampion
+            ? "bg-gradient-to-br from-amber-300 to-amber-500 text-white"
+            : "bg-surface-2"
         }`}
       >
         {(entry.profile.display_name ?? entry.profile.username ?? "?")
@@ -210,7 +227,11 @@ function Row({
         <div className="flex flex-col items-end">
           <span
             className={`text-lg font-semibold leading-none ${
-              isBusted ? "text-amber-600 dark:text-amber-400" : ""
+              isBusted
+                ? "text-amber-600 dark:text-amber-400"
+                : isChampion
+                ? "text-amber-500"
+                : ""
             }`}
           >
             {entry.score}

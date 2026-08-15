@@ -95,3 +95,34 @@ body {
     animation: none;
   }
 }
+
+/* #1 on the leaderboard gets a slow, breathing gold glow instead of just
+   another flat card — a subtle "this one's different" cue rather than
+   anything gaudy. Amplitude is deliberately small (box-shadow spread only
+   moves a few px) so it reads as premium, not like a notification badge. */
+@keyframes champion-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(255, 191, 61, 0.5), 0 0 12px 0 rgba(255, 191, 61, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(255, 191, 61, 0.75), 0 0 22px 4px rgba(255, 191, 61, 0.4);
+  }
+}
+
+.champion-row {
+  border-color: transparent !important;
+  background-image: linear-gradient(
+    135deg,
+    rgba(255, 191, 61, 0.14),
+    rgba(255, 191, 61, 0.03)
+  );
+  animation: champion-glow 2.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .champion-row {
+    animation: none;
+    box-shadow: 0 0 0 1px rgba(255, 191, 61, 0.6), 0 0 14px 0 rgba(255, 191, 61, 0.3);
+  }
+}
