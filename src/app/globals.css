@@ -11,6 +11,7 @@
   --accent-2: #ff9f0a;
   --success: #30d158;
   --slack: #a1a1a6;
+  --shimmer-highlight: #ffffff;
   color-scheme: light;
 }
 
@@ -28,6 +29,7 @@
   --accent-2: #ff9f0a;
   --success: #32d74b;
   --slack: #636366;
+  --shimmer-highlight: #454548;
   color-scheme: dark;
 }
 
@@ -61,4 +63,35 @@ body {
 .theme-transition-ready body,
 .theme-transition-ready * {
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+/* Skeleton shimmer: a moving highlight band reads as "actively working"
+   more convincingly than a static pulse, which tends to make loading
+   states feel stalled rather than in-progress. */
+@keyframes shimmer-sweep {
+  0% {
+    background-position: 150% 0;
+  }
+  100% {
+    background-position: -50% 0;
+  }
+}
+
+.skeleton {
+  background-color: var(--surface-2);
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    var(--shimmer-highlight),
+    transparent
+  );
+  background-repeat: no-repeat;
+  background-size: 60% 100%;
+  animation: shimmer-sweep 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
 }
