@@ -4,7 +4,10 @@ import { computeScore } from "@/lib/scoring";
 import { detectSuspiciousPattern } from "@/lib/fraud";
 import type { Activity, LeaderboardEntry, Profile, Room } from "@/lib/types";
 
-type ScoringActivity = Pick<Activity, "user_id" | "logged_at" | "duration_minutes">;
+type ScoringActivity = Pick<
+  Activity,
+  "user_id" | "logged_at" | "duration_minutes" | "created_at"
+>;
 
 // 30 days feeds the score (consistency/volume window) plus a small buffer
 // so a streak spanning the boundary computes correctly. longestStreak isn't
@@ -57,11 +60,12 @@ export async function getLeaderboard(roomId?: string): Promise<{
       .from("profiles")
       .select("id, username, display_name, avatar_url, created_at")
       .in("id", memberIds),
-    // Only the columns computeScore() actually reads — type/note/id/
-    // created_at aren't used for scoring and just add payload weight.
+    // Only the columns computeScore()/detectSuspiciousPattern() actually
+    // read — type/note/id aren't used and just add payload weight.
+    // created_at (distinct from logged_at) is needed for burst detection.
     supabase
       .from("activities")
-      .select("user_id, logged_at, duration_minutes")
+      .select("user_id, logged_at, duration_minutes, created_at")
       .in("user_id", memberIds)
       .gte(
         "logged_at",
