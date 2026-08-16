@@ -555,7 +555,11 @@ function Row({
         )}
       </div>
 
-      <div className="min-w-0 flex-1">
+      {/* The wreath overflows the avatar wrapper by ~51px on each side
+          (it's absolutely positioned, so flex layout doesn't account for
+          it) — extra left margin here on champion only so its right-side
+          leaves don't sit on top of the name/streak text. */}
+      <div className={`min-w-0 flex-1 ${isChampion ? "ml-9" : ""}`}>
         <div className="flex items-center gap-1.5">
           <p
             className={`truncate font-medium ${
