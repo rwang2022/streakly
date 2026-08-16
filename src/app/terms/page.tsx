@@ -11,7 +11,7 @@ export const metadata = {
 export default function TermsPage() {
   return (
     <main className="min-h-dvh px-6 pb-20 pt-[calc(env(safe-area-inset-top)+2.5rem)]">
-      <div className="mx-auto max-w-md">
+      <div className="mx-auto max-w-2xl">
         <Link
           href="/login"
           className="inline-flex items-center gap-1 text-sm text-muted"

@@ -69,8 +69,8 @@ export default async function HistoryPage() {
   }
 
   return (
-    <main className="min-h-dvh px-6 pb-32 pt-[calc(env(safe-area-inset-top)+2.5rem)]">
-      <div className="mx-auto max-w-md">
+    <main className="min-h-dvh px-6 pb-32 pt-[calc(env(safe-area-inset-top)+2.5rem)] md:pb-10 md:pl-72">
+      <div className="mx-auto max-w-md md:max-w-2xl">
         <h1 className="text-2xl font-semibold tracking-tight">History</h1>
         <p className="mt-1 text-sm text-muted">Last {WEEKS} weeks</p>
 

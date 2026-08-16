@@ -50,8 +50,8 @@ export default async function LeaderboardPage({
   );
 
   return (
-    <main className="min-h-dvh px-6 pb-32 pt-[calc(env(safe-area-inset-top)+2.5rem)]">
-      <div className="mx-auto max-w-md">
+    <main className="min-h-dvh px-6 pb-32 pt-[calc(env(safe-area-inset-top)+2.5rem)] md:pb-10 md:pl-72">
+      <div className="mx-auto max-w-md md:max-w-2xl">
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-2">

@@ -1,7 +1,7 @@
 export default function Loading() {
   return (
-    <main className="min-h-dvh px-6 pb-32 pt-[calc(env(safe-area-inset-top)+2.5rem)]">
-      <div className="mx-auto max-w-md">
+    <main className="min-h-dvh px-6 pb-32 pt-[calc(env(safe-area-inset-top)+2.5rem)] md:pb-10 md:pl-72">
+      <div className="mx-auto max-w-md md:max-w-2xl">
         <div className="h-7 w-40 rounded skeleton" />
         <div className="mt-2 h-4 w-56 rounded skeleton" />
         <div className="mt-5 flex gap-2">
