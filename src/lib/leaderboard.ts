@@ -102,6 +102,7 @@ export async function getLeaderboard(roomId?: string): Promise<{
         lastActiveDate: result.lastActiveDate,
         isSuspicious: suspicion.suspicious,
         suspicionReason: suspicion.reason,
+        usedStreakFreeze: result.usedStreakFreeze,
       };
     }
   );

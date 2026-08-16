@@ -41,6 +41,7 @@ export interface LeaderboardEntry {
   lastActiveDate: string | null;
   isSuspicious: boolean;
   suspicionReason: string | null;
+  usedStreakFreeze: boolean;
 }
 
 export interface Room {

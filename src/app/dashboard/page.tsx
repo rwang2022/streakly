@@ -47,7 +47,7 @@ export default async function DashboardPage() {
           <div className="mt-6 grid w-full grid-cols-2 gap-3">
             <Stat
               icon={<Flame size={16} className="text-accent" />}
-              label="Current streak"
+              label={mine?.usedStreakFreeze ? "Current streak ❄️" : "Current streak"}
               value={`${mine?.currentStreak ?? 0}d`}
             />
             <Stat

@@ -52,6 +52,13 @@ export function ScoreInfo() {
           <p className="mt-2 text-[11px] text-muted">
             Showing up often beats one big session.
           </p>
+          <p className="mt-2 flex items-start gap-1 text-[11px] text-muted">
+            <span>❄️</span>
+            <span>
+              One missed day per week won&apos;t break a streak — it just
+              won&apos;t count toward the number.
+            </span>
+          </p>
           <div className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-l border-t border-border bg-surface" />
         </div>
       )}

@@ -218,6 +218,11 @@ function Row({
               )}
               {entry.currentStreak}d streak · {entry.activeDaysLast30}/30
               active days
+              {entry.usedStreakFreeze && (
+                <span title="A missed day was covered by a streak freeze">
+                  ❄️
+                </span>
+              )}
             </>
           )}
         </p>

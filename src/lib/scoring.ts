@@ -7,6 +7,16 @@ const STREAK_CAP_DAYS = 30;
 const VOLUME_CAP_MINUTES = 600; // ~20 min/day average over 30 days
 const SLACKING_THRESHOLD_DAYS = 3;
 const DEFAULT_DURATION_MINUTES = 20; // credited when a log has no duration set
+// A single missed day doesn't have to end a long streak — one grace day is
+// allowed per rolling week, same idea as Duolingo-style streak freezes.
+// The missed day itself still doesn't count toward the streak *number*
+// (only real active days increment it), it just doesn't reset the chain.
+const FREEZE_WINDOW_DAYS = 7;
+// Safety valve: never walk the streak back further than this, regardless
+// of freezes. Without a bound, a freeze consumed right at the edge of
+// however much activity history was fetched could misread "no data fetched
+// this far back" as "a forgivable miss" and extend the streak indefinitely.
+const MAX_STREAK_LOOKBACK_DAYS = 400;
 
 export interface ScoreResult {
   score: number; // 0-100, weighted 70% consistency / 20% streak / 10% volume
@@ -17,6 +27,7 @@ export interface ScoreResult {
   totalMinutesLast30: number;
   isSlacking: boolean;
   lastActiveDate: string | null;
+  usedStreakFreeze: boolean;
 }
 
 function daysAgoKey(days: number, from: Date, timeZone: string): string {
@@ -62,14 +73,37 @@ export function computeScore(
   }
   const consistencyPct = (activeDaysLast30 / CONSISTENCY_WINDOW_DAYS) * 100;
 
-  // --- current streak (grace: today isn't "missed" until it's over) ---
+  // --- current streak (grace: today isn't "missed" until it's over, plus
+  // one streak-freeze day allowed per rolling week) ---
   const startCursor = activeDates.has(daysAgoKey(0, now, timeZone)) ? 0 : 1;
   let currentStreak = 0;
   let cursor = startCursor;
-  while (activeDates.has(daysAgoKey(cursor, now, timeZone))) {
-    currentStreak += 1;
-    cursor += 1;
+  let usedStreakFreeze = false;
+  const freezesUsedAtCursor: number[] = [];
+  if (activeDates.size > 0) {
+    while (cursor - startCursor < MAX_STREAK_LOOKBACK_DAYS) {
+      const key = daysAgoKey(cursor, now, timeZone);
+      if (activeDates.has(key)) {
+        currentStreak += 1;
+        cursor += 1;
+        continue;
+      }
+      const freezeAvailable = !freezesUsedAtCursor.some(
+        (usedAt) => cursor - usedAt < FREEZE_WINDOW_DAYS
+      );
+      if (freezeAvailable) {
+        freezesUsedAtCursor.push(cursor);
+        usedStreakFreeze = true;
+        cursor += 1;
+        continue;
+      }
+      break;
+    }
   }
+  // A freeze only matters if it actually saved a streak that continues to
+  // count for something — don't report "streak freeze used" for a brand
+  // new/inactive user with no real streak to protect.
+  usedStreakFreeze = usedStreakFreeze && currentStreak > 0;
 
   // --- longest streak across all provided activity ---
   const sortedDates = Array.from(activeDates).sort();
@@ -112,5 +146,6 @@ export function computeScore(
     totalMinutesLast30,
     isSlacking,
     lastActiveDate,
+    usedStreakFreeze,
   };
 }

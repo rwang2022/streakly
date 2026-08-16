@@ -166,7 +166,7 @@ export default async function ProfilePage({
             <div className="mt-3 grid grid-cols-3 gap-3">
               <Stat label="Score" value={String(displayScore)} />
               <Stat
-                label="Streak"
+                label={scoreResult.usedStreakFreeze ? "Streak ❄️" : "Streak"}
                 value={`${scoreResult.currentStreak}d`}
                 icon={<Flame size={13} className="text-accent" />}
               />
