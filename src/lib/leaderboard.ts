@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCachedUser, getRequestTimeZone } from "@/lib/auth";
 import { computeScore } from "@/lib/scoring";
 import { detectSuspiciousPattern } from "@/lib/fraud";
+import { getVouchedUserIds } from "@/lib/vouches";
 import type { Activity, LeaderboardEntry, Profile, Room } from "@/lib/types";
 
 type ScoringActivity = Pick<
@@ -55,23 +56,25 @@ export async function getLeaderboard(roomId?: string): Promise<{
     memberIds = Array.from(new Set([user.id, ...friendIds]));
   }
 
-  const [{ data: profiles }, { data: activities }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, username, display_name, avatar_url, created_at")
-      .in("id", memberIds),
-    // Only the columns computeScore()/detectSuspiciousPattern() actually
-    // read — type/note/id aren't used and just add payload weight.
-    // created_at (distinct from logged_at) is needed for burst detection.
-    supabase
-      .from("activities")
-      .select("user_id, logged_at, duration_minutes, created_at")
-      .in("user_id", memberIds)
-      .gte(
-        "logged_at",
-        new Date(Date.now() - LOOKBACK_DAYS * 86400000).toISOString()
-      ),
-  ]);
+  const [{ data: profiles }, { data: activities }, vouchedUserIds] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, username, display_name, avatar_url, created_at")
+        .in("id", memberIds),
+      // Only the columns computeScore()/detectSuspiciousPattern() actually
+      // read — type/note/id aren't used and just add payload weight.
+      // created_at (distinct from logged_at) is needed for burst detection.
+      supabase
+        .from("activities")
+        .select("user_id, logged_at, duration_minutes, created_at")
+        .in("user_id", memberIds)
+        .gte(
+          "logged_at",
+          new Date(Date.now() - LOOKBACK_DAYS * 86400000).toISOString()
+        ),
+      getVouchedUserIds(memberIds),
+    ]);
 
   const activitiesByUser = new Map<string, ScoringActivity[]>();
   for (const a of (activities ?? []) as ScoringActivity[]) {
@@ -85,11 +88,14 @@ export async function getLeaderboard(roomId?: string): Promise<{
       const userActivities = activitiesByUser.get(profile.id) ?? [];
       const result = computeScore(userActivities, new Date(), timeZone);
       const suspicion = detectSuspiciousPattern(userActivities, timeZone);
+      const isVouched = suspicion.suspicious && vouchedUserIds.has(profile.id);
       // Flat -100 penalty, deliberately not clamped back to 0 — the whole
       // point is it visibly wrecks your rank (drops you below everyone,
       // even someone slacking), not just resets you to where a brand new
-      // user would start.
-      const score = suspicion.suspicious ? result.score - 100 : result.score;
+      // user would start. Suppressed if a friend has vouched: the flag
+      // itself stays visible (transparency), just not the punishment.
+      const score =
+        suspicion.suspicious && !isVouched ? result.score - 100 : result.score;
       return {
         profile,
         score,
@@ -102,6 +108,7 @@ export async function getLeaderboard(roomId?: string): Promise<{
         lastActiveDate: result.lastActiveDate,
         isSuspicious: suspicion.suspicious,
         suspicionReason: suspicion.reason,
+        isVouched,
         usedStreakFreeze: result.usedStreakFreeze,
       };
     }

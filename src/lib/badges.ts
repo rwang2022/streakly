@@ -12,9 +12,17 @@ export interface Badge {
  * still gets something fun instead of just a number.
  */
 export function getBadge(
-  entry: Pick<LeaderboardEntry, "score" | "isSlacking" | "isSuspicious">
+  entry: Pick<
+    LeaderboardEntry,
+    "score" | "isSlacking" | "isSuspicious" | "isVouched"
+  >
 ): Badge {
-  if (entry.isSuspicious) return { emoji: "🚨", label: "Busted" };
+  if (entry.isSuspicious && !entry.isVouched) {
+    return { emoji: "🚨", label: "Busted" };
+  }
+  if (entry.isSuspicious && entry.isVouched) {
+    return { emoji: "🤝", label: "Vouched" };
+  }
   if (entry.isSlacking) return { emoji: "🪦", label: "RIP streak" };
   if (entry.score >= 90) return { emoji: "🐐", label: "GOAT" };
   if (entry.score >= 75) return { emoji: "🔥", label: "Locked in" };

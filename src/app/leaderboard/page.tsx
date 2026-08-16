@@ -124,7 +124,10 @@ function Row({
 }) {
   const badge = getBadge(entry);
   const daysSince = daysSinceLastActive(entry.lastActiveDate, todayKey);
-  const isBusted = entry.isSuspicious;
+  // Vouched-for entries keep the flag visible (via the badge pill below)
+  // but don't get the full dramatic "busted" row treatment or the -100
+  // penalty (already suppressed upstream in lib/leaderboard.ts).
+  const isBusted = entry.isSuspicious && !entry.isVouched;
   // #1 gets the glow treatment — but only if they've actually earned it.
   // A slacking or busted account sitting at rank 1 (e.g. everyone else is
   // also inactive) shouldn't get a celebratory glow layered on top of a

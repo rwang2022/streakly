@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { ArrowLeft, Flag, Flame, Dumbbell, Mountain, PersonStanding, Zap, Sparkles } from "lucide-react";
+import { ArrowLeft, Flag, Flame, Handshake, Dumbbell, Mountain, PersonStanding, Zap, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser, getRequestTimeZone } from "@/lib/auth";
 import { computeScore } from "@/lib/scoring";
 import { detectSuspiciousPattern } from "@/lib/fraud";
+import { isVouchFresh } from "@/lib/vouches";
 import { getBadge } from "@/lib/badges";
 import { BottomNav } from "@/components/BottomNav";
+import { VouchButton } from "@/components/VouchButton";
 import type { Activity } from "@/lib/types";
 import { daysAgoIso, formatDateKey, formatDisplayDate } from "@/lib/date";
 
@@ -84,11 +86,41 @@ export default async function ProfilePage({
   const noAccess = !hasAccess;
   const scoreResult = computeScore(activities, new Date(), timeZone);
   const suspicion = detectSuspiciousPattern(activities, timeZone);
+
+  // Has a friend/roommate vouched this is real? Only matters if something
+  // was actually flagged. Fetched as raw rows (not just a boolean) so we
+  // can also tell whether *this viewer* is the one who vouched, for the
+  // button's state, and who to credit in the banner below.
+  const { data: vouchRows } =
+    hasAccess && suspicion.suspicious
+      ? await supabase
+          .from("activity_vouches")
+          .select("vouched_by, created_at")
+          .eq("user_id", id)
+      : { data: [] as { vouched_by: string; created_at: string }[] };
+  const activeVouches = (vouchRows ?? []).filter((v) => isVouchFresh(v.created_at));
+  const isVouched = suspicion.suspicious && activeVouches.length > 0;
+  const myVouch = activeVouches.some((v) => v.vouched_by === user?.id);
+
+  const voucherIds = activeVouches.map((v) => v.vouched_by);
+  const { data: voucherProfiles } =
+    voucherIds.length > 0
+      ? await supabase
+          .from("profiles")
+          .select("id, display_name, username")
+          .in("id", voucherIds)
+      : { data: [] as { id: string; display_name: string | null; username: string | null }[] };
+  const voucherNames = (voucherProfiles ?? [])
+    .map((p) => p.display_name ?? `@${p.username}`)
+    .join(", ");
+
   // Same flat -100 penalty applied on the leaderboard, uncapped so it can
-  // go negative — see lib/leaderboard.ts for the rationale.
-  const displayScore = suspicion.suspicious
-    ? scoreResult.score - 100
-    : scoreResult.score;
+  // go negative — see lib/leaderboard.ts for the rationale. Suppressed if
+  // vouched: the flag stays visible, just not the punishment.
+  const displayScore =
+    suspicion.suspicious && !isVouched
+      ? scoreResult.score - 100
+      : scoreResult.score;
   const activeDates = new Set(
     activities.map((a) => formatDateKey(new Date(a.logged_at), timeZone))
   );
@@ -151,15 +183,29 @@ export default async function ProfilePage({
             <div className="mt-6 flex items-center justify-center">
               <span
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-                  suspicion.suspicious
+                  suspicion.suspicious && !isVouched
                     ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                    : suspicion.suspicious && isVouched
+                    ? "bg-success/15 text-success"
                     : scoreResult.isSlacking
                     ? "bg-accent-2/15 text-accent-2"
                     : "bg-surface-2 text-muted"
                 }`}
               >
-                {getBadge({ ...scoreResult, isSuspicious: suspicion.suspicious }).emoji}{" "}
-                {getBadge({ ...scoreResult, isSuspicious: suspicion.suspicious }).label}
+                {
+                  getBadge({
+                    ...scoreResult,
+                    isSuspicious: suspicion.suspicious,
+                    isVouched,
+                  }).emoji
+                }{" "}
+                {
+                  getBadge({
+                    ...scoreResult,
+                    isSuspicious: suspicion.suspicious,
+                    isVouched,
+                  }).label
+                }
               </span>
             </div>
 
@@ -173,7 +219,7 @@ export default async function ProfilePage({
               <Stat label="Active/30d" value={String(scoreResult.activeDaysLast30)} />
             </div>
 
-            {suspicion.suspicious && (
+            {suspicion.suspicious && !isVouched && (
               <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
                 <Flag size={14} className="mt-0.5 shrink-0" />
                 <p>
@@ -181,8 +227,24 @@ export default async function ProfilePage({
                   {suspicion.reason}. Score would&apos;ve been{" "}
                   {scoreResult.score} — flagged patterns like this tank it
                   instead. Not proof of anything, just a heads up to friends.
+                  A friend can vouch below to clear it.
                 </p>
               </div>
+            )}
+
+            {suspicion.suspicious && isVouched && (
+              <div className="mt-4 flex items-start gap-2 rounded-2xl border border-success/30 bg-success/10 px-4 py-3 text-xs text-success">
+                <Handshake size={14} className="mt-0.5 shrink-0" />
+                <p>
+                  <span className="font-medium">Penalty cleared:</span>{" "}
+                  {suspicion.reason}, but vouched for by {voucherNames || "a friend"}.
+                  Score stayed at {scoreResult.score}.
+                </p>
+              </div>
+            )}
+
+            {hasAccess && !isSelf && suspicion.suspicious && (
+              <VouchButton targetUserId={id} initiallyVouched={myVouch} />
             )}
 
             <p className="mt-8 text-sm font-medium text-muted">

@@ -280,3 +280,47 @@ drop trigger if exists activities_rate_limit on public.activities;
 create trigger activities_rate_limit
   before insert on public.activities
   for each row execute procedure public.enforce_activity_rate_limit();
+-- Migration 7: friends/roommates can vouch to clear a suspicious flag.
+
+create table if not exists public.activity_vouches (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  vouched_by uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  constraint no_self_vouch check (user_id <> vouched_by),
+  constraint unique_voucher_per_user unique (user_id, vouched_by)
+);
+
+create index if not exists activity_vouches_user_idx on public.activity_vouches (user_id);
+
+alter table public.activity_vouches enable row level security;
+
+create policy "vouches visible to the people involved"
+  on public.activity_vouches for select
+  to authenticated
+  using (
+    auth.uid() = user_id
+    or auth.uid() = vouched_by
+    or public.is_friend(auth.uid(), user_id)
+    or public.share_room(auth.uid(), user_id)
+  );
+
+create policy "friends or roommates can vouch"
+  on public.activity_vouches for insert
+  to authenticated
+  with check (
+    auth.uid() = vouched_by
+    and auth.uid() <> user_id
+    and (public.is_friend(auth.uid(), user_id) or public.share_room(auth.uid(), user_id))
+  );
+
+create policy "a voucher can update their own vouch"
+  on public.activity_vouches for update
+  to authenticated
+  using (auth.uid() = vouched_by)
+  with check (auth.uid() = vouched_by);
+
+create policy "a voucher can retract their own vouch"
+  on public.activity_vouches for delete
+  to authenticated
+  using (auth.uid() = vouched_by);
