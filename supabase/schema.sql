@@ -251,3 +251,32 @@ alter table public.activities
 -- delete from public.activities
 --   where user_id = '00000000-0000-0000-0000-000000000000'
 --   and (logged_at > now() or logged_at < now() - interval '24 hours');
+-- Migration 6: rate-limit activity inserts at the database level.
+-- 12/day is deliberately generous — only ever blocks genuine spam.
+
+create or replace function public.enforce_activity_rate_limit()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  recent_count integer;
+begin
+  select count(*) into recent_count
+  from public.activities
+  where user_id = new.user_id
+    and created_at >= now() - interval '24 hours';
+
+  if recent_count >= 12 then
+    raise exception 'Too many activities logged in the last 24 hours. Try again later.'
+      using errcode = 'P0001';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists activities_rate_limit on public.activities;
+create trigger activities_rate_limit
+  before insert on public.activities
+  for each row execute procedure public.enforce_activity_rate_limit();

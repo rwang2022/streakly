@@ -22,17 +22,27 @@ export default function LogActivityPage() {
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
     setSaving(true);
+    setError(null);
     const supabase = createClient();
     const {
       data: { session },
     } = await supabase.auth.getSession();
     const user = session?.user ?? null;
-    if (!user) return;
+    if (!user) {
+      setSaving(false);
+      return;
+    }
 
-    await supabase.from("activities").insert({
+    // The insert can genuinely fail — a database-level guardrail (date
+    // sanity check, daily rate limit) rejected it, or the connection
+    // dropped. Silently discarding the result here would mean the app
+    // says "Logged" and redirects even though nothing was saved, which is
+    // worse than just being slow: it actively hides the failure.
+    const { error: insertError } = await supabase.from("activities").insert({
       user_id: user.id,
       type,
       duration_minutes: duration ? Number(duration) : null,
@@ -41,6 +51,16 @@ export default function LogActivityPage() {
     });
 
     setSaving(false);
+
+    if (insertError) {
+      setError(
+        insertError.message.includes("Too many activities")
+          ? "You've hit today's logging limit. Try again tomorrow."
+          : "Couldn't save that. Try again in a moment."
+      );
+      return;
+    }
+
     setSaved(true);
     setTimeout(() => router.push("/dashboard"), 450);
   }
@@ -93,6 +113,12 @@ export default function LogActivityPage() {
           placeholder="Leg day, trail loop, evening walk…"
           className="mt-2 w-full rounded-2xl border border-border bg-surface px-4 py-3.5 outline-none focus:border-accent"
         />
+
+        {error && (
+          <p className="mt-4 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
+            {error}
+          </p>
+        )}
 
         <button
           onClick={handleSave}
