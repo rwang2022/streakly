@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f5f5f7",
+  themeColor: "#000000",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -25,15 +25,16 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-// Runs before first paint so the saved (or system) theme applies with zero
-// flash of the wrong colors. Also enables CSS transitions only after the
-// initial theme is set, so later manual toggles fade smoothly instead of
-// the very first page load visibly animating in.
+// Runs before first paint so the saved theme (or dark, the default for
+// anyone who hasn't chosen yet) applies with zero flash of the wrong
+// colors. Also enables CSS transitions only after the initial theme is
+// set, so later manual toggles fade smoothly instead of the very first
+// page load visibly animating in.
 const THEME_INIT_SCRIPT = `
 (function () {
   try {
     var stored = localStorage.getItem("streakly-theme");
-    var isDark = stored ? stored === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    var isDark = stored ? stored === "dark" : true;
     var root = document.documentElement;
     if (isDark) root.classList.add("dark");
     var meta = document.querySelector('meta[name="theme-color"]');
