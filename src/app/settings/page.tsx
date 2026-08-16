@@ -7,6 +7,7 @@ import { ArrowLeft, LogOut, Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { PushToggle } from "@/components/PushToggle";
 import { DataControls } from "@/components/DataControls";
 import type { Profile } from "@/lib/types";
 
@@ -66,6 +67,8 @@ export default function SettingsPage() {
         <div className="mt-6">
           <ThemeToggle />
         </div>
+
+        <PushToggle />
 
         <div className="mt-6 flex items-start gap-3 rounded-2xl border border-border bg-surface px-4 py-4">
           <Shield size={18} className="mt-0.5 shrink-0 text-muted" />

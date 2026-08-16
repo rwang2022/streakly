@@ -35,3 +35,37 @@ self.addEventListener("fetch", (event) => {
     fetch(event.request).catch(() => caches.match("/offline.html"))
   );
 });
+
+// Daily reminder push, sent by /api/cron/reminders. Payload is a small
+// JSON blob: { title, body, url }.
+self.addEventListener("push", (event) => {
+  let payload = { title: "Streakly", body: "Don't break the streak.", url: "/dashboard" };
+  try {
+    if (event.data) payload = { ...payload, ...event.data.json() };
+  } catch {
+    // Fall back to the default payload above if it wasn't valid JSON.
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: payload.url },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/dashboard";
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clients) => {
+        const existing = clients.find((c) => "focus" in c);
+        if (existing) return existing.focus();
+        return self.clients.openWindow(url);
+      })
+  );
+});
