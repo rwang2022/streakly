@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
@@ -40,6 +41,16 @@ export default function LoginPage() {
         <p className="mt-6 text-xs text-muted">
           One tap. No passwords. Your workout data stays private to you and
           the friends you add.
+        </p>
+
+        <p className="mt-4 text-xs text-muted">
+          <Link href="/privacy" className="underline">
+            Privacy
+          </Link>
+          {" · "}
+          <Link href="/terms" className="underline">
+            Terms
+          </Link>
         </p>
       </div>
     </main>
