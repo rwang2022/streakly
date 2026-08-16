@@ -26,7 +26,14 @@ export default function LoginPage() {
         </div>
         <h1 className="text-3xl font-semibold tracking-tight">Streakly</h1>
         <p className="mt-2 text-muted">
-          Log your workouts. Stay consistent. Keep your friends honest.
+          Streakly is a private, friends-only fitness accountability app.
+          Log your workouts, build a streak, and see how you stack up
+          against friends and roommates on a shared leaderboard — nothing
+          public, no strangers, no ads.
+        </p>
+        <p className="mt-3 text-xs text-muted">
+          Signing in with Google only shares your name, email, and profile
+          photo, used to create your Streakly account.
         </p>
 
         <button
