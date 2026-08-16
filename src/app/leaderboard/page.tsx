@@ -99,7 +99,10 @@ export default async function LeaderboardPage({
           ))}
         </div>
 
-        <div className="mt-9 space-y-2">
+        {/* Extra top room (vs. a plain mt-9) so the big crown above the
+            champion row has clearance above it without colliding with the
+            room-switcher tabs — verified against a scaled mockup. */}
+        <div className="mt-28 space-y-2">
           {entries.length === 0 && (
             <p className="mt-10 text-center text-sm text-muted">
               {activeRoom
@@ -133,13 +136,20 @@ export default async function LeaderboardPage({
   );
 }
 
-function MossBlob({ className }: { className?: string }) {
+function MossBlob({
+  className,
+  style,
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+}) {
   return (
     <svg
       width="20"
       height="15"
       viewBox="0 0 20 15"
       className={className}
+      style={style}
       aria-hidden
     >
       <ellipse cx="4.5" cy="9" rx="4.5" ry="3.2" fill="#5c7a3f" opacity="0.85" />
@@ -151,29 +161,45 @@ function MossBlob({ className }: { className?: string }) {
   );
 }
 
-// A wreath of tangent-oriented leaves hugging the bottom of the avatar
-// circle (from ~100° to ~250°, leaving the top open for the crown) —
-// verified at actual avatar scale as a mockup before porting the
-// coordinates here, since a naive full-height stack of leaves just reads
-// as a blurry dotted ring at this size rather than a wreath.
+// A fuller, more botanical laurel wreath: paired leaflets branching off a
+// curved stem that hugs the bottom of the avatar (~95°→260°, leaving the
+// top open for the crown), rather than a single ring of plain ellipses.
+// Verified at actual avatar scale as a mockup before porting the
+// coordinates here — a naive version of this reads as a blurry dotted
+// ring at small sizes rather than a wreath.
 function Laurel({ side }: { side: "left" | "right" }) {
   const flip = side === "right";
-  const leaves = Array.from({ length: 7 }).map((_, i) => {
-    const t = i / 6;
-    const angDeg = lerp(100, 250, t);
+  const n = 9;
+  const stemPts: { x: number; y: number }[] = [];
+  const leaves: {
+    x: number;
+    y: number;
+    size: number;
+    rot: number;
+  }[] = [];
+
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    const angDeg = lerp(95, 260, t);
     const a = flip ? 180 - angDeg : angDeg;
     const rad = (a * Math.PI) / 180;
-    const r = 1.16;
-    const size = lerp(0.16, 0.24, t);
+    const r = 1.14;
+    const x = Math.cos(rad) * r;
+    const y = Math.sin(rad) * r;
+    stemPts.push({ x, y });
     const tangent = a + 90;
-    const rot = flip ? tangent + 180 : tangent;
-    return {
-      x: Math.cos(rad) * r,
-      y: Math.sin(rad) * r,
-      size,
-      rot,
-    };
-  });
+    const leafSize = lerp(0.15, 0.24, t);
+    const perp = ((a + 90) * Math.PI) / 180;
+    for (const dir of [-1, 1]) {
+      const offX = Math.cos(perp) * leafSize * 0.65 * dir;
+      const offY = Math.sin(perp) * leafSize * 0.65 * dir;
+      const rot = tangent + dir * 20 + (flip ? 180 : 0);
+      leaves.push({ x: x + offX, y: y + offY, size: leafSize, rot });
+    }
+  }
+
+  const stemPath =
+    "M " + stemPts.map((p) => `${p.x.toFixed(3)} ${p.y.toFixed(3)}`).join(" L ");
 
   return (
     <svg
@@ -181,19 +207,48 @@ function Laurel({ side }: { side: "left" | "right" }) {
       aria-hidden
       className="pointer-events-none absolute inset-0 h-full w-full"
     >
+      <path d={stemPath} fill="none" stroke="#8a5a08" strokeWidth="0.02" opacity="0.8" />
       {leaves.map((leaf, i) => (
         <ellipse
           key={i}
           cx={leaf.x}
           cy={leaf.y}
           rx={leaf.size}
-          ry={leaf.size * 0.4}
-          fill="#b8790f"
+          ry={leaf.size * 0.42}
+          fill="#c98a12"
           stroke="#8a5a08"
-          strokeWidth="0.02"
+          strokeWidth="0.012"
           transform={`rotate(${leaf.rot} ${leaf.x} ${leaf.y})`}
         />
       ))}
+    </svg>
+  );
+}
+
+// A big decorative crown floating above the CHAMPION ribbon — separate
+// from the small rank-slot crown icon, which stays as the plain "this is
+// rank 1" indicator. Sized and positioned against a verified mockup so it
+// clears the room-switcher tabs above it instead of colliding with them.
+function BigCrown() {
+  return (
+    <svg
+      viewBox="-40 -30 80 60"
+      aria-hidden
+      className="pointer-events-none absolute -top-[86px] left-1/2 h-[68px] w-[68px] -translate-x-1/2 -z-10"
+    >
+      <path
+        d="M -30 22 L -35 -12 L -14 8 L 0 -26 L 14 8 L 35 -12 L 30 22 Z"
+        fill="#f6a623"
+        stroke="#c9860a"
+        strokeWidth="2"
+      />
+      <rect x="-30" y="18" width="60" height="7" rx="2" fill="#c9860a" />
+      <circle cx="-35" cy="-12" r="5.5" fill="#ffd60a" />
+      <circle cx="0" cy="-26" r="7" fill="#ffd60a" />
+      <circle cx="35" cy="-12" r="5.5" fill="#ffd60a" />
+      <circle cx="0" cy="9" r="4.5" fill="#ff453a" />
+      <circle cx="-17" cy="15" r="3.2" fill="#30d158" />
+      <circle cx="17" cy="15" r="3.2" fill="#0a84ff" />
     </svg>
   );
 }
@@ -229,29 +284,58 @@ function Tombstone({
       : `Last seen ${daysSince}d ago`;
 
   const content = (
-    <div className="relative flex flex-col items-center pb-3 pt-2">
+    <div className="relative flex flex-col items-center pb-4 pt-6">
       <span className="text-[10px] font-medium text-muted">#{rank}</span>
 
-      <div className="relative mt-3 flex flex-col items-center">
-        {/* small cross above the stone */}
-        <div className="relative h-4 w-4">
-          <div className="absolute left-1/2 top-0 h-4 w-1 -translate-x-1/2 rounded-full bg-border" />
-          <div className="absolute left-1/2 top-1 h-1 w-4 -translate-x-1/2 rounded-full bg-border" />
+      <div className="relative mt-4 flex flex-col items-center">
+        {/* bigger cross above the stone */}
+        <div className="relative h-6 w-6">
+          <div className="absolute left-1/2 top-0 h-6 w-[7px] -translate-x-1/2 rounded-sm bg-border" />
+          <div className="absolute left-1/2 top-[7px] h-[7px] w-6 -translate-x-1/2 rounded-sm bg-border" />
         </div>
 
-        {/* headstone */}
-        <div className="relative -mt-px w-56 rounded-t-[4.5rem] rounded-b-lg border border-border bg-surface-2 px-4 pb-3 pt-6 text-center shadow-sm active:scale-[0.99]">
-          <MossBlob className="absolute -left-1.5 bottom-2" />
-          <MossBlob className="absolute -right-1.5 top-8 scale-x-[-1]" />
-          <MossBlob className="absolute left-8 top-0.5 scale-75 opacity-90" />
+        {/* headstone — bigger, with a weathered stone texture and cracks */}
+        <div
+          className="relative -mt-px w-72 rounded-t-[5.5rem] rounded-b-lg border-2 border-border px-5 pb-4 pt-8 text-center shadow-md active:scale-[0.99]"
+          style={{
+            background:
+              "radial-gradient(ellipse at 35% 25%, var(--surface) 0%, var(--surface-2) 100%)",
+          }}
+        >
+          {/* crack lines etched into the stone */}
+          <svg
+            aria-hidden
+            viewBox="0 0 288 190"
+            className="pointer-events-none absolute inset-0 h-full w-full opacity-40"
+          >
+            <path
+              d="M 90 40 L 104 68 L 96 90"
+              fill="none"
+              stroke="currentColor"
+              className="text-muted"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M 210 70 L 200 96"
+              fill="none"
+              stroke="currentColor"
+              className="text-muted"
+              strokeWidth="1.5"
+            />
+          </svg>
 
-          <p className="font-serif text-xs font-bold tracking-[0.3em] text-muted">
+          <MossBlob className="absolute -left-2 bottom-3 scale-125" />
+          <MossBlob className="absolute -right-2 top-14 scale-110 scale-x-[-1]" />
+          <MossBlob className="absolute left-10 -top-1 scale-90 opacity-90" />
+          <MossBlob className="absolute right-12 bottom-2 scale-100 opacity-90" />
+
+          <p className="font-serif text-sm font-bold tracking-[0.35em] text-muted">
             R.I.P.
           </p>
-          <div className="mx-auto mt-1.5 h-px w-16 bg-border" />
-          <div className="mt-2 flex items-center justify-center gap-1.5">
-            <Skull size={13} className="shrink-0 text-muted" />
-            <p className="truncate text-sm font-semibold text-muted line-through decoration-muted/60">
+          <div className="mx-auto mt-2 h-px w-20 bg-border" />
+          <div className="mt-3 flex items-center justify-center gap-1.5">
+            <Skull size={17} className="shrink-0 text-muted" />
+            <p className="truncate text-base font-bold text-muted line-through decoration-muted/60">
               {name}
               {entry.isMe && (
                 <span className="ml-1 text-xs font-normal no-underline text-muted">
@@ -260,14 +344,15 @@ function Tombstone({
               )}
             </p>
           </div>
-          <p className="mt-1 text-[11px] text-muted/80">{epitaph}</p>
-          <p className="mt-2 text-xs font-semibold text-muted">
+          <p className="mt-1.5 text-xs text-muted/80">{epitaph}</p>
+          <p className="mt-2.5 text-sm font-semibold text-muted">
             {entry.score} pts
           </p>
         </div>
 
         {/* ground shadow */}
-        <div className="mt-0.5 h-2.5 w-44 rounded-full bg-black/10 blur-[2px] dark:bg-black/50" />
+        <div className="mt-1 h-3 w-56 rounded-full bg-black/15 blur-[3px] dark:bg-black/50" />
+        <MossBlob className="-mt-3 scale-125 opacity-90" />
       </div>
     </div>
   );
@@ -338,17 +423,25 @@ function Row({
     slackerLine = `Last seen ${daysSince}d ago`;
   }
 
+  // Verified against a scaled mockup (including the real slacker-count
+  // math, not just an isolated 4-row test) that -12deg/0.45 opacity still
+  // leaves a clean gap above the tombstone instead of overlapping it.
   const cardStyle: React.CSSProperties | undefined = isDecaying
     ? {
         transformOrigin: "center",
-        opacity: lerp(1, 0.5, decayT),
+        opacity: lerp(1, 0.45, decayT),
         transform: `scale(${lerp(1, 0.6, decayT)}) rotate(${lerp(
           0,
-          -7,
+          -12,
           decayT
         )}deg)`,
       }
     : undefined;
+
+  // More moss the further decayed a row is — one small cluster once it
+  // starts going quiet, growing to three spread across the card by the
+  // time it's nearly at the tombstone.
+  const mossCount = decayT > 0.1 ? 1 + Math.floor(decayT * 3) : 0;
 
   const inner = (
     <div
@@ -357,7 +450,7 @@ function Row({
         isChampion ? "champion-row py-7" : "py-4"
       } ${
         isBusted
-          ? "border-dashed border-amber-500/50 bg-amber-500/10"
+          ? "border-2 border-accent bg-accent/10"
           : isDecaying
           ? "border-dashed border-border bg-surface-2/60"
           : isChampion
@@ -367,6 +460,15 @@ function Row({
           : "border-border bg-surface active:bg-surface-2"
       }`}
     >
+      {isBusted && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-accent px-4 py-1.5 text-[10px] font-bold tracking-[0.2em] text-white shadow-sm"
+        >
+          DISGRACED
+        </div>
+      )}
+
       {isChampion && (
         <>
           {/* soft gold glow, sized to fit inside the row's own gap so it
@@ -379,22 +481,22 @@ function Row({
                 "radial-gradient(ellipse at center, rgba(245,158,11,0.45) 0%, rgba(245,158,11,0.15) 45%, transparent 75%)",
             }}
           />
-          {/* literal sunburst rays crowning the ribbon — viewBox units are
-              ~1:1 with real px (deliberately short rays, verified against a
-              scaled mockup first) so they stay contained just above the
-              card instead of shooting off past the tab bar */}
+          {/* literal sunburst rays fanning out from behind the big crown —
+              short rays in a viewBox close to real px, verified against a
+              scaled mockup so they stay contained above the card instead
+              of shooting off past the tab bar */}
           <svg
             aria-hidden
-            viewBox="0 0 200 50"
-            className="pointer-events-none absolute -top-8 left-0 h-12 w-full -z-10"
+            viewBox="0 0 200 66"
+            className="pointer-events-none absolute -top-16 left-0 h-16 w-full -z-10"
           >
-            {Array.from({ length: 13 }).map((_, i) => {
-              const angle = -150 + i * 10;
+            {Array.from({ length: 15 }).map((_, i) => {
+              const angle = -160 + i * (320 / 14);
               const rad = (angle * Math.PI) / 180;
               const x1 = 100;
-              const y1 = 44;
-              const x2 = x1 + Math.cos(rad) * 34;
-              const y2 = y1 + Math.sin(rad) * 34;
+              const y1 = 60;
+              const x2 = x1 + Math.cos(rad) * 30;
+              const y2 = y1 + Math.sin(rad) * 30;
               return (
                 <line
                   key={i}
@@ -403,25 +505,34 @@ function Row({
                   x2={x2}
                   y2={y2}
                   stroke="#f5b942"
-                  strokeWidth={i % 2 === 0 ? 2.2 : 1.3}
-                  opacity={i % 2 === 0 ? 0.55 : 0.32}
+                  strokeWidth={i % 2 === 0 ? 2.2 : 1.2}
+                  opacity={i % 2 === 0 ? 0.55 : 0.3}
                 />
               );
             })}
           </svg>
+          <BigCrown />
           {/* CHAMPION ribbon */}
           <div
             aria-hidden
-            className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-3.5 py-1 text-[9px] font-bold tracking-[0.2em] text-white shadow-sm"
+            className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 px-4 py-1.5 text-[10px] font-bold tracking-[0.2em] text-white shadow-sm"
           >
             CHAMPION
           </div>
         </>
       )}
 
-      {isDecaying && decayT > 0.15 && (
+      {mossCount > 0 && (
         <>
-          <MossBlob className="pointer-events-none absolute bottom-1 left-1 opacity-80" />
+          {Array.from({ length: mossCount }).map((_, mi) => (
+            <MossBlob
+              key={mi}
+              className="pointer-events-none absolute bottom-1 opacity-85"
+              style={{
+                left: `${8 + mi * (74 / Math.max(mossCount - 1, 1))}%`,
+              }}
+            />
+          ))}
           {decayT > 0.5 && (
             <MossBlob className="pointer-events-none absolute right-1 top-1 scale-75 opacity-70" />
           )}
@@ -450,7 +561,7 @@ function Row({
         <div
           className={`flex items-center justify-center rounded-full font-semibold ${
             isChampion
-              ? "h-[72px] w-[72px] text-2xl bg-gradient-to-br from-amber-300 to-amber-500 text-white ring-[3px] ring-amber-300/70 ring-offset-2 ring-offset-surface"
+              ? "h-[88px] w-[88px] text-3xl bg-gradient-to-br from-amber-300 to-amber-500 text-white ring-[3px] ring-amber-300/70 ring-offset-2 ring-offset-surface"
               : "h-10 w-10 text-sm"
           } ${
             isBusted || isDecaying
@@ -468,15 +579,36 @@ function Row({
               .toUpperCase()
           )}
         </div>
+        {/* a hard diagonal slash across the avatar — "struck off", not
+            just faded — for the caught-cheating case */}
+        {isBusted && (
+          <svg
+            aria-hidden
+            viewBox="0 0 40 40"
+            className="pointer-events-none absolute inset-0 h-full w-full"
+          >
+            <line
+              x1="7"
+              y1="7"
+              x2="33"
+              y2="33"
+              stroke="#ff453a"
+              strokeWidth="4"
+              strokeLinecap="round"
+            />
+          </svg>
+        )}
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <p
             className={`truncate font-medium ${
-              isChampion ? "text-xl" : ""
+              isChampion ? "text-2xl" : ""
             } ${
-              entry.isSlacking && !isBusted
+              isBusted
+                ? "text-accent line-through decoration-accent/70"
+                : entry.isSlacking
                 ? "text-muted line-through decoration-accent-2/50"
                 : ""
             }`}
@@ -489,7 +621,7 @@ function Row({
           title={isBusted ? entry.suspicionReason ?? undefined : undefined}
           className={`mt-0.5 flex items-center gap-1 text-xs ${
             isBusted
-              ? "font-semibold text-amber-600 dark:text-amber-400"
+              ? "font-semibold text-accent"
               : entry.isSlacking
               ? "font-semibold text-accent-2"
               : "text-muted"
@@ -527,10 +659,10 @@ function Row({
         <div className="flex flex-col items-end">
           <span
             className={`font-semibold leading-none ${
-              isChampion ? "text-4xl" : "text-lg"
+              isChampion ? "text-5xl" : "text-lg"
             } ${
               isBusted
-                ? "text-amber-600 dark:text-amber-400"
+                ? "text-accent line-through decoration-accent/70"
                 : isChampion
                 ? "text-amber-500"
                 : ""
@@ -545,7 +677,7 @@ function Row({
         <span
           className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-medium ${
             isBusted
-              ? "bg-amber-500/20 text-amber-600 dark:text-amber-400"
+              ? "bg-accent/20 text-accent"
               : entry.isSlacking
               ? "bg-accent-2/20 text-accent-2"
               : "bg-surface-2 text-muted"
