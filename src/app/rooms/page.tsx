@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Copy, Check, Plus, DoorOpen, Users, LogOut, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { generateInviteCode } from "@/lib/inviteCode";
+import { SITE_URL } from "@/lib/site";
 import { BottomNav } from "@/components/BottomNav";
 import type { Room } from "@/lib/types";
 
@@ -132,7 +133,7 @@ export default function RoomsPage() {
   }
 
   function copyLink(room: Room) {
-    const link = `${window.location.origin}/join/${room.invite_code}`;
+    const link = `${SITE_URL}/join/${room.invite_code}`;
     navigator.clipboard.writeText(link).then(() => {
       setCopiedId(room.id);
       setTimeout(() => setCopiedId(null), 1500);
