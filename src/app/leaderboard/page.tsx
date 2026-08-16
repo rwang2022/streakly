@@ -402,10 +402,11 @@ function Row({
       }
     : undefined;
 
-  // More moss the further decayed a row is — one small cluster once it
-  // starts going quiet, growing to three spread across the card by the
-  // time it's nearly at the tombstone.
-  const mossCount = decayT > 0.1 ? 1 + Math.floor(decayT * 3) : 0;
+  // More moss the further decayed a row is — starts almost immediately
+  // and piles up fast, so by the time a row is nearing the tombstone
+  // it's nearly overgrown rather than just lightly spotted.
+  const mossCount = decayT > 0.05 ? Math.min(5, 1 + Math.floor(decayT * 6)) : 0;
+  const mossScale = lerp(0.75, 1.35, decayT);
 
   const inner = (
     <div
@@ -425,12 +426,41 @@ function Row({
       }`}
     >
       {isBusted && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-accent px-4 py-1.5 text-[10px] font-bold tracking-[0.2em] text-white shadow-sm"
-        >
-          DISGRACED
-        </div>
+        <>
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-accent px-4 py-1.5 text-[10px] font-bold tracking-[0.2em] text-white shadow-sm"
+          >
+            DISGRACED
+          </div>
+          {/* fracture lines spreading across the whole card, like the
+              tombstone's crack accents — "broken", not just flagged */}
+          <svg
+            aria-hidden
+            viewBox="0 0 300 100"
+            preserveAspectRatio="none"
+            className="pointer-events-none absolute inset-0 h-full w-full text-accent opacity-25"
+          >
+            <path
+              d="M 60 0 L 52 22 L 68 34 L 48 52 L 66 66 L 40 100"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+            <path
+              d="M 150 8 L 165 30 L 145 46 L 172 70"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.2"
+            />
+            <path
+              d="M 230 0 L 218 20 L 238 40 L 210 58 L 232 100"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            />
+          </svg>
+        </>
       )}
 
       {isChampion && (
@@ -494,11 +524,22 @@ function Row({
               className="pointer-events-none absolute bottom-1 opacity-85"
               style={{
                 left: `${8 + mi * (74 / Math.max(mossCount - 1, 1))}%`,
+                bottom: mi % 2 === 0 ? "2px" : "10px",
+                transform: `scale(${mossScale})`,
               }}
             />
           ))}
-          {decayT > 0.5 && (
-            <MossBlob className="pointer-events-none absolute right-1 top-1 scale-75 opacity-70" />
+          {decayT > 0.35 && (
+            <MossBlob
+              className="pointer-events-none absolute right-1 top-1 opacity-75"
+              style={{ transform: `scale(${mossScale * 0.7})` }}
+            />
+          )}
+          {decayT > 0.6 && (
+            <MossBlob
+              className="pointer-events-none absolute left-1 top-1 opacity-70"
+              style={{ transform: `scale(${mossScale * 0.6}) scaleX(-1)` }}
+            />
           )}
         </>
       )}
@@ -543,14 +584,29 @@ function Row({
         {/* wreath renders after (on top of) the avatar so its leaves
             overlap the avatar's outer edge slightly, like a real wreath */}
         {isChampion && <Laurel />}
-        {/* a hard diagonal slash across the avatar — "struck off", not
-            just faded — for the caught-cheating case */}
+        {/* a hard diagonal slash plus shatter cracks across the avatar —
+            "struck off" and broken, not just faded — for the
+            caught-cheating case */}
         {isBusted && (
           <svg
             aria-hidden
             viewBox="0 0 40 40"
             className="pointer-events-none absolute inset-0 h-full w-full"
           >
+            <path
+              d="M 14 4 L 17 14 L 10 19 L 20 24 L 15 36"
+              fill="none"
+              stroke="#7a1a13"
+              strokeWidth="1"
+              opacity="0.6"
+            />
+            <path
+              d="M 30 10 L 24 18 L 32 24 L 27 33"
+              fill="none"
+              stroke="#7a1a13"
+              strokeWidth="1"
+              opacity="0.6"
+            />
             <line
               x1="7"
               y1="7"
