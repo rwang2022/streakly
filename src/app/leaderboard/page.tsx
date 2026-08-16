@@ -87,7 +87,7 @@ export default async function LeaderboardPage({
           ))}
         </div>
 
-        <div className="mt-4 space-y-2">
+        <div className="mt-7 space-y-2">
           {entries.length === 0 && (
             <p className="mt-10 text-center text-sm text-muted">
               {activeRoom
