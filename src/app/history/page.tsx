@@ -65,22 +65,22 @@ export default async function HistoryPage() {
   }
 
   return (
-    <main className="min-h-dvh px-6 pb-32 pt-10">
+    <main className="min-h-dvh px-6 pb-32 pt-[calc(env(safe-area-inset-top)+2.5rem)]">
       <div className="mx-auto max-w-md">
         <h1 className="text-2xl font-semibold tracking-tight">History</h1>
         <p className="mt-1 text-sm text-muted">Last {WEEKS} weeks</p>
 
-        <div className="mt-6 flex gap-1 overflow-x-auto rounded-2xl border border-border bg-surface p-4">
+        <div className="mt-6 grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1.5 rounded-2xl border border-border bg-surface p-4">
           {columns.map((col, i) => (
-            <div key={i} className="flex flex-col gap-1">
+            <div key={i} className="flex flex-col gap-1.5">
               {col.map((day) =>
                 day.isFuture ? (
-                  <div key={day.key} className="h-3 w-3" />
+                  <div key={day.key} className="aspect-square w-full" />
                 ) : (
                   <div
                     key={day.key}
                     title={day.key}
-                    className={`h-3 w-3 rounded-[3px] ${
+                    className={`aspect-square w-full rounded-[3px] ${
                       day.active ? "bg-accent" : "bg-surface-2"
                     }`}
                   />

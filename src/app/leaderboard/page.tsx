@@ -38,7 +38,7 @@ export default async function LeaderboardPage({
   const activeRoom = roomId ? rooms.find((r) => r.id === roomId) : null;
 
   return (
-    <main className="min-h-dvh px-6 pb-32 pt-10">
+    <main className="min-h-dvh px-6 pb-32 pt-[calc(env(safe-area-inset-top)+2.5rem)]">
       <div className="mx-auto max-w-md">
         <div className="flex items-start justify-between">
           <div>

@@ -12,7 +12,7 @@ export const metadata = {
 
 export default function PrivacyPage() {
   return (
-    <main className="min-h-dvh px-6 pb-20 pt-10">
+    <main className="min-h-dvh px-6 pb-20 pt-[calc(env(safe-area-inset-top)+2.5rem)]">
       <div className="mx-auto max-w-md">
         <Link
           href="/login"

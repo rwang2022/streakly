@@ -66,7 +66,7 @@ export default function LogActivityPage() {
   }
 
   return (
-    <main className="min-h-dvh px-6 pb-32 pt-10">
+    <main className="min-h-dvh px-6 pb-32 pt-[calc(env(safe-area-inset-top)+2.5rem)]">
       <div className="mx-auto max-w-md">
         <h1 className="text-2xl font-semibold tracking-tight">
           Log activity
