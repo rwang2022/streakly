@@ -3,6 +3,14 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/auth/callback", "/join", "/privacy", "/terms"];
 
+// Google Search Console's "HTML file" domain-ownership verification serves
+// a static file like /google88149f6b8ea54fea.html straight from /public —
+// it has to return the actual file content to Google's crawler (which has
+// no session), not get redirected to /login like every other unauthed
+// request. Matched by pattern rather than one hardcoded filename so a
+// future re-verification file doesn't silently break the same way.
+const GOOGLE_SITE_VERIFICATION_PATTERN = /^\/google[0-9a-f]+\.html$/;
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -41,7 +49,9 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getSession();
 
   const path = request.nextUrl.pathname;
-  const isPublic = PUBLIC_PATHS.some((p) => path.startsWith(p));
+  const isPublic =
+    PUBLIC_PATHS.some((p) => path.startsWith(p)) ||
+    GOOGLE_SITE_VERIFICATION_PATTERN.test(path);
 
   if (!session && !isPublic) {
     const url = request.nextUrl.clone();
