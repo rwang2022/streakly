@@ -173,7 +173,11 @@ function Laurel() {
       src="/laurel-wreath.svg"
       alt=""
       aria-hidden
-      className="pointer-events-none absolute select-none"
+      className="pointer-events-none absolute select-none max-w-none"
+      // Tailwind's preflight sets `img { max-width: 100% }`, which — since
+      // this img's containing block is the 88px avatar wrapper, not the
+      // page — would otherwise cap this down to 88px regardless of the
+      // width set below. max-w-none overrides that.
       style={{ width: 190, left: -51, top: -54 }}
     />
   );
