@@ -6,15 +6,36 @@ import { createClient } from "@/lib/supabase/server";
 export const VOUCH_VALID_DAYS = 7;
 
 /**
+ * User ids currently marked `is_admin` on their profile. Anyone can vouch
+ * (shown as social support), but only an admin's vouch actually clears the
+ * penalty — see getVouchedUserIds() below.
+ */
+export async function getAdminUserIds(): Promise<Set<string>> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("profiles").select("id").eq("is_admin", true);
+  return new Set((data ?? []).map((row) => row.id as string));
+}
+
+/**
  * Which of the given user ids currently have at least one valid (not
- * stale) vouch from a friend/roommate. Used to decide whether the -100
- * suspicious-activity penalty should be suppressed for each leaderboard
- * entry — batched into one query rather than one per row.
+ * stale) vouch *from an admin specifically*. Used to decide whether the
+ * -100 suspicious-activity penalty should be suppressed for each
+ * leaderboard entry — batched into one query rather than one per row.
+ *
+ * A vouch from a regular friend/roommate is still allowed (RLS from
+ * migration_7 is unchanged) and still shows up on the profile page as
+ * social support, but it alone doesn't clear anything — only an admin's
+ * does. This is deliberate: a small trust-based app still needs someone
+ * whose call is final, or "vouching" just becomes "whoever asks a friend
+ * first wins."
  */
 export async function getVouchedUserIds(
   userIds: string[]
 ): Promise<Set<string>> {
   if (userIds.length === 0) return new Set();
+  const adminIds = await getAdminUserIds();
+  if (adminIds.size === 0) return new Set();
+
   const supabase = await createClient();
   const cutoff = new Date(
     Date.now() - VOUCH_VALID_DAYS * 24 * 60 * 60 * 1000
@@ -22,8 +43,9 @@ export async function getVouchedUserIds(
 
   const { data } = await supabase
     .from("activity_vouches")
-    .select("user_id")
+    .select("user_id, vouched_by")
     .in("user_id", userIds)
+    .in("vouched_by", Array.from(adminIds))
     .gte("created_at", cutoff);
 
   return new Set((data ?? []).map((row) => row.user_id as string));

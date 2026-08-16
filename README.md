@@ -187,6 +187,25 @@ Run `supabase/migration_8_push_subscriptions.sql`. Adds
 `push_subscriptions`, needed only if you set up push reminders (see
 below) — the app works fine without it.
 
+## Migration 9: admin-only vouch clearing
+
+Run `supabase/migration_9_admin_vouches.sql`. Adds `is_admin` to
+`profiles` — see "Suspicious activity detection" below for what this
+changes.
+
+After running it, mark your own account as admin. First find your user
+id in the Supabase SQL editor:
+
+```sql
+select id, username, display_name from public.profiles;
+```
+
+Then, with that id:
+
+```sql
+update public.profiles set is_admin = true where id = '<your-user-id>';
+```
+
 ## Suspicious activity detection
 
 `lib/fraud.ts` flags two patterns that look like gamed data rather than
@@ -204,9 +223,12 @@ uncapped, so it can go negative and actually sink their rank, not just
 reset them to a new-user baseline) and a "🚨 Busted" badge on the
 leaderboard. This is a heuristic, not proof — any friend or roommate
 (never the flagged person themselves) can vouch on that person's profile
-page that it's real, which clears the penalty (badge changes to "🤝
-Vouched") for 7 days. The flag itself stays visible either way; only the
-punishment is what vouching lifts.
+page that it's real, and every vouch is shown/credited by name as social
+support. But only a vouch from an admin account (`is_admin = true`)
+actually clears the penalty (badge changes to "🤝 Vouched") for 7 days —
+see Migration 9 above for how to make yourself an admin. The flag itself
+stays visible either way; only the punishment is what an admin's vouch
+lifts.
 
 ## Streak freezes
 

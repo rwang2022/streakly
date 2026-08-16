@@ -92,8 +92,10 @@ export async function getLeaderboard(roomId?: string): Promise<{
       // Flat -100 penalty, deliberately not clamped back to 0 — the whole
       // point is it visibly wrecks your rank (drops you below everyone,
       // even someone slacking), not just resets you to where a brand new
-      // user would start. Suppressed if a friend has vouched: the flag
-      // itself stays visible (transparency), just not the punishment.
+      // user would start. Suppressed only once an admin specifically has
+      // vouched (getVouchedUserIds already filters to admin-sourced vouches
+      // — see lib/vouches.ts): the flag itself stays visible (transparency),
+      // just not the punishment.
       const score =
         suspicion.suspicious && !isVouched ? result.score - 100 : result.score;
       return {

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCachedUser, getRequestTimeZone } from "@/lib/auth";
 import { computeScore } from "@/lib/scoring";
 import { detectSuspiciousPattern } from "@/lib/fraud";
-import { isVouchFresh } from "@/lib/vouches";
+import { getAdminUserIds, isVouchFresh } from "@/lib/vouches";
 import { getBadge } from "@/lib/badges";
 import { BottomNav } from "@/components/BottomNav";
 import { VouchButton } from "@/components/VouchButton";
@@ -99,8 +99,12 @@ export default async function ProfilePage({
           .eq("user_id", id)
       : { data: [] as { vouched_by: string; created_at: string }[] };
   const activeVouches = (vouchRows ?? []).filter((v) => isVouchFresh(v.created_at));
-  const isVouched = suspicion.suspicious && activeVouches.length > 0;
+  // Anyone can vouch and everyone who has is shown/credited below, but only
+  // an admin's vouch actually lifts the penalty — see lib/vouches.ts.
+  const adminIds = suspicion.suspicious ? await getAdminUserIds() : new Set<string>();
+  const isVouched = activeVouches.some((v) => adminIds.has(v.vouched_by));
   const myVouch = activeVouches.some((v) => v.vouched_by === user?.id);
+  const hasNonAdminVouches = activeVouches.length > 0 && !isVouched;
 
   const voucherIds = activeVouches.map((v) => v.vouched_by);
   const { data: voucherProfiles } =
@@ -115,8 +119,9 @@ export default async function ProfilePage({
     .join(", ");
 
   // Same flat -100 penalty applied on the leaderboard, uncapped so it can
-  // go negative — see lib/leaderboard.ts for the rationale. Suppressed if
-  // vouched: the flag stays visible, just not the punishment.
+  // go negative — see lib/leaderboard.ts for the rationale. Suppressed only
+  // once an admin specifically has vouched — a pile of non-admin vouches
+  // alone still leaves the flag (and penalty) in place.
   const displayScore =
     suspicion.suspicious && !isVouched
       ? scoreResult.score - 100
@@ -226,8 +231,10 @@ export default async function ProfilePage({
                   <span className="font-medium">-100 penalty applied:</span>{" "}
                   {suspicion.reason}. Score would&apos;ve been{" "}
                   {scoreResult.score} — flagged patterns like this tank it
-                  instead. Not proof of anything, just a heads up to friends.
-                  A friend can vouch below to clear it.
+                  instead. Not proof of anything, just a heads up to friends.{" "}
+                  {hasNonAdminVouches
+                    ? `Vouched for by ${voucherNames}, but only an admin's vouch clears it.`
+                    : "Only an admin's vouch clears it."}
                 </p>
               </div>
             )}
@@ -237,8 +244,9 @@ export default async function ProfilePage({
                 <Handshake size={14} className="mt-0.5 shrink-0" />
                 <p>
                   <span className="font-medium">Penalty cleared:</span>{" "}
-                  {suspicion.reason}, but vouched for by {voucherNames || "a friend"}.
-                  Score stayed at {scoreResult.score}.
+                  {suspicion.reason}, but vouched for by{" "}
+                  {voucherNames || "an admin"}. Score stayed at{" "}
+                  {scoreResult.score}.
                 </p>
               </div>
             )}
