@@ -7,6 +7,7 @@ import { ArrowLeft, LogOut, Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { DataControls } from "@/components/DataControls";
 import type { Profile } from "@/lib/types";
 
 export default function SettingsPage() {
@@ -81,6 +82,8 @@ export default function SettingsPage() {
           <LogOut size={18} />
           Sign out
         </button>
+
+        <DataControls />
       </div>
       <BottomNav />
     </main>
