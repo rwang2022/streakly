@@ -178,7 +178,13 @@ function Laurel() {
       // this img's containing block is the 88px avatar wrapper, not the
       // page — would otherwise cap this down to 88px regardless of the
       // width set below. max-w-none overrides that.
-      style={{ width: 190, left: -51, top: -54 }}
+      //
+      // 140/-26/-28 (re-verified at 4x scale, not just a small preview —
+      // the first pass at 190/-51/-54 looked snug in a small composite
+      // but left a real gap around the avatar and overlapped neighboring
+      // elements) puts the avatar snugly inside the wreath's ring with
+      // leaves just overlapping its edge, matching a real wreath.
+      style={{ width: 140, left: -26, top: -28 }}
     />
   );
 }
@@ -509,7 +515,10 @@ function Row({
         )}
       </div>
 
-      <div className="relative shrink-0">
+      {/* Extra left margin on champion only: the wreath still overflows
+          the avatar by ~26px on each side, which would otherwise sit on
+          top of the small rank-slot crown icon just to the left. */}
+      <div className={`relative shrink-0 ${isChampion ? "ml-4" : ""}`}>
         <div
           className={`flex items-center justify-center rounded-full font-semibold ${
             isChampion
@@ -555,11 +564,11 @@ function Row({
         )}
       </div>
 
-      {/* The wreath overflows the avatar wrapper by ~51px on each side
+      {/* The wreath overflows the avatar wrapper by ~26px on each side
           (it's absolutely positioned, so flex layout doesn't account for
           it) — extra left margin here on champion only so its right-side
           leaves don't sit on top of the name/streak text. */}
-      <div className={`min-w-0 flex-1 ${isChampion ? "ml-9" : ""}`}>
+      <div className={`min-w-0 flex-1 ${isChampion ? "ml-4" : ""}`}>
         <div className="flex items-center gap-1.5">
           <p
             className={`truncate font-medium ${
