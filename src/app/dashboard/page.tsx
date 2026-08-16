@@ -4,11 +4,55 @@ import { getLeaderboard } from "@/lib/leaderboard";
 import { ScoreRing } from "@/components/ScoreRing";
 import { BottomNav } from "@/components/BottomNav";
 import { getBadge } from "@/lib/badges";
+import type { LeaderboardEntry } from "@/lib/types";
+
+/**
+ * A short, honest one-liner comparing this week (last 7 calendar days,
+ * already timezone-correct via activeDaysLast7) against friends — gives
+ * people a reason to come back mid-week instead of only checking in when
+ * their streak is on the line.
+ */
+function buildWeeklyRecap(
+  entries: LeaderboardEntry[]
+): { icon: string; text: string } | null {
+  const mine = entries.find((e) => e.isMe);
+  if (!mine) return null;
+  const friends = entries.filter((e) => !e.isMe);
+  const myDays = mine.activeDaysLast7;
+
+  if (myDays === 7) {
+    return { icon: "🔥", text: "Perfect week — active every single day." };
+  }
+  if (myDays === 0) {
+    return friends.length > 0
+      ? { icon: "👀", text: "No activity yet this week — everyone else is lapping you." }
+      : { icon: "👀", text: "No activity yet this week. Today's a good day to start." };
+  }
+  if (friends.length === 0) {
+    return { icon: "📅", text: `${myDays}/7 days active this week.` };
+  }
+
+  const beaten = friends.filter((f) => f.activeDaysLast7 < myDays).length;
+  if (beaten === friends.length) {
+    return { icon: "🏆", text: `Most active of the group this week (${myDays}/7 days).` };
+  }
+  if (beaten === 0) {
+    return {
+      icon: "🐢",
+      text: `Behind the group this week (${myDays}/7 days) — everyone else is outpacing you.`,
+    };
+  }
+  return {
+    icon: "📈",
+    text: `Ahead of ${beaten} of ${friends.length} friends this week (${myDays}/7 days).`,
+  };
+}
 
 export default async function DashboardPage() {
   const { entries, me } = await getLeaderboard();
   const mine = entries.find((e) => e.isMe);
   const rank = mine ? entries.findIndex((e) => e.isMe) + 1 : null;
+  const recap = buildWeeklyRecap(entries);
 
   return (
     <main className="min-h-dvh px-6 pb-32 pt-10">
@@ -57,9 +101,21 @@ export default async function DashboardPage() {
           </div>
         </div>
 
+        {recap && (
+          <div className="mt-4 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3.5">
+            <span className="text-xl">{recap.icon}</span>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted">
+                This week
+              </p>
+              <p className="text-sm font-medium">{recap.text}</p>
+            </div>
+          </div>
+        )}
+
         <Link
           href="/log"
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-5 py-4 font-medium text-background shadow-sm transition active:scale-[0.98]"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-foreground px-5 py-4 font-medium text-background shadow-sm transition active:scale-[0.98]"
         >
           <Plus size={18} />
           Log activity

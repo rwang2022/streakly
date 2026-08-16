@@ -3,6 +3,7 @@ import { formatDateKey, daysBetweenDateKeys, DEFAULT_TIMEZONE } from "@/lib/date
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CONSISTENCY_WINDOW_DAYS = 30;
+const WEEK_WINDOW_DAYS = 7;
 const STREAK_CAP_DAYS = 30;
 const VOLUME_CAP_MINUTES = 600; // ~20 min/day average over 30 days
 const SLACKING_THRESHOLD_DAYS = 3;
@@ -23,6 +24,7 @@ export interface ScoreResult {
   consistencyPct: number;
   currentStreak: number;
   longestStreak: number;
+  activeDaysLast7: number;
   activeDaysLast30: number;
   totalMinutesLast30: number;
   isSlacking: boolean;
@@ -63,12 +65,14 @@ export function computeScore(
     );
   }
   let activeDaysLast30 = 0;
+  let activeDaysLast7 = 0;
   let totalMinutesLast30 = 0;
   for (let i = 0; i < CONSISTENCY_WINDOW_DAYS; i++) {
     const key = daysAgoKey(i, now, timeZone);
     if (activeDates.has(key)) {
       activeDaysLast30 += 1;
       totalMinutesLast30 += minutesByDate.get(key) ?? 0;
+      if (i < WEEK_WINDOW_DAYS) activeDaysLast7 += 1;
     }
   }
   const consistencyPct = (activeDaysLast30 / CONSISTENCY_WINDOW_DAYS) * 100;
@@ -142,6 +146,7 @@ export function computeScore(
     consistencyPct: Math.round(consistencyPct),
     currentStreak,
     longestStreak,
+    activeDaysLast7,
     activeDaysLast30,
     totalMinutesLast30,
     isSlacking,

@@ -45,6 +45,14 @@ describe("computeScore", () => {
     const result = computeScore(activities, NOW, TZ);
     expect(result.currentStreak).toBe(5);
     expect(result.activeDaysLast30).toBe(5);
+    expect(result.activeDaysLast7).toBe(5);
+  });
+
+  it("only counts the trailing 7 days toward activeDaysLast7, unlike activeDaysLast30", () => {
+    const activities = Array.from({ length: 10 }, (_, i) => activityDaysAgo(i));
+    const result = computeScore(activities, NOW, TZ);
+    expect(result.activeDaysLast7).toBe(7);
+    expect(result.activeDaysLast30).toBe(10);
   });
 
   it("breaks the streak on a gap too big for one freeze to cover", () => {

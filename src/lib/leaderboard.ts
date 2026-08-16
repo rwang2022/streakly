@@ -102,6 +102,7 @@ export async function getLeaderboard(roomId?: string): Promise<{
         consistencyPct: result.consistencyPct,
         currentStreak: result.currentStreak,
         longestStreak: result.longestStreak,
+        activeDaysLast7: result.activeDaysLast7,
         activeDaysLast30: result.activeDaysLast30,
         isSlacking: result.isSlacking,
         isMe: profile.id === user.id,

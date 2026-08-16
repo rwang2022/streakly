@@ -35,6 +35,7 @@ export interface LeaderboardEntry {
   consistencyPct: number;
   currentStreak: number;
   longestStreak: number;
+  activeDaysLast7: number;
   activeDaysLast30: number;
   isSlacking: boolean;
   isMe: boolean;
