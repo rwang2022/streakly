@@ -151,37 +151,49 @@ function MossBlob({ className }: { className?: string }) {
   );
 }
 
+// A wreath of tangent-oriented leaves hugging the bottom of the avatar
+// circle (from ~100° to ~250°, leaving the top open for the crown) —
+// verified at actual avatar scale as a mockup before porting the
+// coordinates here, since a naive full-height stack of leaves just reads
+// as a blurry dotted ring at this size rather than a wreath.
 function Laurel({ side }: { side: "left" | "right" }) {
   const flip = side === "right";
+  const leaves = Array.from({ length: 7 }).map((_, i) => {
+    const t = i / 6;
+    const angDeg = lerp(100, 250, t);
+    const a = flip ? 180 - angDeg : angDeg;
+    const rad = (a * Math.PI) / 180;
+    const r = 1.16;
+    const size = lerp(0.16, 0.24, t);
+    const tangent = a + 90;
+    const rot = flip ? tangent + 180 : tangent;
+    return {
+      x: Math.cos(rad) * r,
+      y: Math.sin(rad) * r,
+      size,
+      rot,
+    };
+  });
+
   return (
     <svg
-      width="26"
-      height="42"
-      viewBox="0 0 26 42"
+      viewBox="-1.3 -1.3 2.6 2.6"
       aria-hidden
-      className={`pointer-events-none absolute top-1/2 -translate-y-1/2 ${
-        flip ? "-right-4 scale-x-[-1]" : "-left-4"
-      }`}
+      className="pointer-events-none absolute inset-0 h-full w-full"
     >
-      {[0, 1, 2, 3].map((i) => {
-        const cy = 5 + i * 10.5;
-        const rx = 6.5 - i * 0.5;
-        const rot = -35 + i * 10;
-        return (
-          <ellipse
-            key={i}
-            cx="12"
-            cy={cy}
-            rx={rx}
-            ry="3.4"
-            fill="#f5b942"
-            stroke="#c9860a"
-            strokeWidth="0.5"
-            opacity={0.65 + i * 0.08}
-            transform={`rotate(${rot} 12 ${cy})`}
-          />
-        );
-      })}
+      {leaves.map((leaf, i) => (
+        <ellipse
+          key={i}
+          cx={leaf.x}
+          cy={leaf.y}
+          rx={leaf.size}
+          ry={leaf.size * 0.4}
+          fill="#b8790f"
+          stroke="#8a5a08"
+          strokeWidth="0.02"
+          transform={`rotate(${leaf.rot} ${leaf.x} ${leaf.y})`}
+        />
+      ))}
     </svg>
   );
 }
@@ -340,7 +352,7 @@ function Row({
   const inner = (
     <div
       style={cardStyle}
-      className={`relative flex items-center gap-3 overflow-hidden rounded-2xl border px-4 transition active:scale-[0.99] ${
+      className={`relative flex items-center gap-3 rounded-2xl border px-4 transition active:scale-[0.99] ${
         isChampion ? "champion-row py-5" : "py-4"
       } ${
         isBusted
@@ -373,9 +385,9 @@ function Row({
 
       {isDecaying && decayT > 0.15 && (
         <>
-          <MossBlob className="pointer-events-none absolute -bottom-1 -left-1 opacity-80" />
+          <MossBlob className="pointer-events-none absolute bottom-1 left-1 opacity-80" />
           {decayT > 0.5 && (
-            <MossBlob className="pointer-events-none absolute -top-1 -right-1 scale-75 opacity-70" />
+            <MossBlob className="pointer-events-none absolute right-1 top-1 scale-75 opacity-70" />
           )}
         </>
       )}
