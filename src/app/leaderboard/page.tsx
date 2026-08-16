@@ -3,6 +3,7 @@ import { Crown, Flag, Flame, Settings2, Skull, Star } from "lucide-react";
 import { getLeaderboard, getMyRooms } from "@/lib/leaderboard";
 import { BottomNav } from "@/components/BottomNav";
 import { ScoreInfo } from "@/components/ScoreInfo";
+import { ShareRankButton } from "@/components/ShareRankButton";
 import { getBadge } from "@/lib/badges";
 import { getRequestTimeZone } from "@/lib/auth";
 import { formatDateKey, daysBetweenDateKeys } from "@/lib/date";
@@ -250,6 +251,16 @@ function Tombstone({
   const content = (
     <div className="relative flex flex-col items-center pb-4 pt-6">
       <span className="text-[10px] font-medium text-muted">#{rank}</span>
+
+      <div className="absolute right-2 top-4">
+        <ShareRankButton
+          variant="tombstone"
+          name={name}
+          rank={rank}
+          score={entry.score}
+          subtitle={epitaph}
+        />
+      </div>
 
       <div className="relative mt-4 flex flex-col items-center">
         {/* bigger cross above the stone */}
@@ -710,6 +721,22 @@ function Row({
           {badge.emoji} {badge.label}
         </span>
       </div>
+
+      <ShareRankButton
+        variant={isChampion ? "champion" : isBusted ? "disgraced" : "normal"}
+        name={entry.profile.display_name ?? `@${entry.profile.username}`}
+        rank={rank}
+        score={entry.score}
+        subtitle={
+          isBusted
+            ? "Caught gaming it — score tanked"
+            : entry.isSlacking
+            ? slackerLine
+            : `${entry.currentStreak}d streak · ${entry.activeDaysLast30}/30 active days`
+        }
+        badgeLabel={badge.label}
+        decaying={isDecaying}
+      />
     </div>
   );
 
