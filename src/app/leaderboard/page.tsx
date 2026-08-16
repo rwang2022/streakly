@@ -4,6 +4,10 @@ import { getLeaderboard, getMyRooms } from "@/lib/leaderboard";
 import { BottomNav } from "@/components/BottomNav";
 import { ScoreInfo } from "@/components/ScoreInfo";
 import { ShareRankButton } from "@/components/ShareRankButton";
+import {
+  ShareLeaderboardButton,
+  type ShareLeaderboardRow,
+} from "@/components/ShareLeaderboardButton";
 import { getBadge } from "@/lib/badges";
 import { getRequestTimeZone } from "@/lib/auth";
 import { formatDateKey, daysBetweenDateKeys } from "@/lib/date";
@@ -42,6 +46,28 @@ export default async function LeaderboardPage({
 
   const activeRoom = roomId ? rooms.find((r) => r.id === roomId) : null;
 
+  // Precomputed once so both the header share button and each Row can
+  // reuse the same status logic without repeating it inline.
+  const shareRows: ShareLeaderboardRow[] = entries.map((entry, i) => {
+    const rank = i + 1;
+    const isBusted = entry.isSuspicious && !entry.isVouched;
+    const isChampion = rank === 1 && !isBusted && !entry.isSlacking;
+    const status: ShareLeaderboardRow["status"] = isChampion
+      ? "champion"
+      : isBusted
+      ? "busted"
+      : entry.isSlacking
+      ? "slacking"
+      : "normal";
+    return {
+      rank,
+      name: entry.profile.display_name ?? `@${entry.profile.username}`,
+      score: entry.score,
+      status,
+      isMe: entry.isMe,
+    };
+  });
+
   // Rows that have "gone quiet" (but weren't caught gaming the system —
   // that's its own separate red-flag treatment, not part of the graveyard).
   // These decay progressively the further down the pack they are, and the
@@ -65,13 +91,21 @@ export default async function LeaderboardPage({
               Ranked by consistency, not just volume.
             </p>
           </div>
-          <Link
-            href="/rooms"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-muted"
-            aria-label="Manage rooms"
-          >
-            <Settings2 size={16} />
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            {entries.length > 0 && (
+              <ShareLeaderboardButton
+                title={activeRoom ? activeRoom.name : "Friends"}
+                rows={shareRows}
+              />
+            )}
+            <Link
+              href="/rooms"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-muted"
+              aria-label="Manage rooms"
+            >
+              <Settings2 size={16} />
+            </Link>
+          </div>
         </div>
 
         <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
