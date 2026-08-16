@@ -200,9 +200,9 @@ function Laurel({ side }: { side: "left" | "right" }) {
 
 function ChampionStars() {
   return (
-    <div className="mt-1 flex items-center gap-0.5">
+    <div className="mt-1.5 flex items-center gap-1">
       {Array.from({ length: 5 }).map((_, i) => (
-        <Star key={i} size={11} className="fill-amber-400 text-amber-500" />
+        <Star key={i} size={13} className="fill-amber-400 text-amber-500" />
       ))}
     </div>
   );
@@ -340,10 +340,11 @@ function Row({
 
   const cardStyle: React.CSSProperties | undefined = isDecaying
     ? {
-        opacity: lerp(1, 0.6, decayT),
-        transform: `scale(${lerp(1, 0.92, decayT)}) rotate(${lerp(
+        transformOrigin: "center",
+        opacity: lerp(1, 0.5, decayT),
+        transform: `scale(${lerp(1, 0.6, decayT)}) rotate(${lerp(
           0,
-          -3,
+          -7,
           decayT
         )}deg)`,
       }
@@ -353,7 +354,7 @@ function Row({
     <div
       style={cardStyle}
       className={`relative flex items-center gap-3 rounded-2xl border px-4 transition active:scale-[0.99] ${
-        isChampion ? "champion-row py-5" : "py-4"
+        isChampion ? "champion-row py-7" : "py-4"
       } ${
         isBusted
           ? "border-dashed border-amber-500/50 bg-amber-500/10"
@@ -368,11 +369,46 @@ function Row({
     >
       {isChampion && (
         <>
-          {/* soft gold sunburst-style glow behind the whole card */}
+          {/* soft gold glow, sized to fit inside the row's own gap so it
+              doesn't fight neighboring cards for paint order */}
           <div
             aria-hidden
-            className="pointer-events-none absolute -inset-x-6 -inset-y-8 -z-10 rounded-[2.5rem] bg-[radial-gradient(ellipse_at_center,rgba(245,158,11,0.28),transparent_70%)] blur-xl"
+            className="pointer-events-none absolute -inset-x-8 -inset-y-3 -z-10 rounded-[2.5rem] blur-lg"
+            style={{
+              background:
+                "radial-gradient(ellipse at center, rgba(245,158,11,0.45) 0%, rgba(245,158,11,0.15) 45%, transparent 75%)",
+            }}
           />
+          {/* literal sunburst rays crowning the ribbon — viewBox units are
+              ~1:1 with real px (deliberately short rays, verified against a
+              scaled mockup first) so they stay contained just above the
+              card instead of shooting off past the tab bar */}
+          <svg
+            aria-hidden
+            viewBox="0 0 200 50"
+            className="pointer-events-none absolute -top-8 left-0 h-12 w-full -z-10"
+          >
+            {Array.from({ length: 13 }).map((_, i) => {
+              const angle = -150 + i * 10;
+              const rad = (angle * Math.PI) / 180;
+              const x1 = 100;
+              const y1 = 44;
+              const x2 = x1 + Math.cos(rad) * 34;
+              const y2 = y1 + Math.sin(rad) * 34;
+              return (
+                <line
+                  key={i}
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  stroke="#f5b942"
+                  strokeWidth={i % 2 === 0 ? 2.2 : 1.3}
+                  opacity={i % 2 === 0 ? 0.55 : 0.32}
+                />
+              );
+            })}
+          </svg>
           {/* CHAMPION ribbon */}
           <div
             aria-hidden
@@ -414,7 +450,7 @@ function Row({
         <div
           className={`flex items-center justify-center rounded-full font-semibold ${
             isChampion
-              ? "h-14 w-14 text-lg bg-gradient-to-br from-amber-300 to-amber-500 text-white ring-2 ring-amber-300/60 ring-offset-2 ring-offset-surface"
+              ? "h-[72px] w-[72px] text-2xl bg-gradient-to-br from-amber-300 to-amber-500 text-white ring-[3px] ring-amber-300/70 ring-offset-2 ring-offset-surface"
               : "h-10 w-10 text-sm"
           } ${
             isBusted || isDecaying
@@ -438,7 +474,7 @@ function Row({
         <div className="flex items-center gap-1.5">
           <p
             className={`truncate font-medium ${
-              isChampion ? "text-base" : ""
+              isChampion ? "text-xl" : ""
             } ${
               entry.isSlacking && !isBusted
                 ? "text-muted line-through decoration-accent-2/50"
@@ -491,7 +527,7 @@ function Row({
         <div className="flex flex-col items-end">
           <span
             className={`font-semibold leading-none ${
-              isChampion ? "text-2xl" : "text-lg"
+              isChampion ? "text-4xl" : "text-lg"
             } ${
               isBusted
                 ? "text-amber-600 dark:text-amber-400"
