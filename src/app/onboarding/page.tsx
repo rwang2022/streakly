@@ -11,6 +11,18 @@ function normalize(input: string) {
     .slice(0, 20);
 }
 
+// Where to send the person once their profile is set up. Read straight off
+// window.location rather than useSearchParams() so this stays a plain client
+// component with no Suspense-boundary requirement. Only ever an internal
+// path (e.g. from a room join link) — validated to start with exactly one
+// "/" so it can't be turned into an open redirect to another origin.
+function getSafeNextPath(): string | null {
+  if (typeof window === "undefined") return null;
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return null;
+  return next;
+}
+
 export default function OnboardingPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -54,7 +66,7 @@ export default function OnboardingPage() {
       return;
     }
 
-    router.replace("/dashboard");
+    router.replace(getSafeNextPath() ?? "/dashboard");
   }
 
   return (

@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useState, use as usePromise } from "react";
+import { useEffect, useRef, useState, use as usePromise } from "react";
 import { useRouter } from "next/navigation";
 import { Users, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { Room } from "@/lib/types";
 
-type Status = "loading" | "not-found" | "error" | "signed-out" | "needs-username" | "ready" | "joined";
+// "ready" is a brief transitional state (auto-joins immediately, see the
+// effect below) rather than something the person has to click through —
+// clicking an invite link is already the confirmation. "joining" is what
+// actually renders while that upsert is in flight.
+type Status = "loading" | "not-found" | "error" | "signed-out" | "needs-username" | "ready" | "joining" | "joined";
 
 export default function JoinRoomPage({
   params,
@@ -18,6 +22,7 @@ export default function JoinRoomPage({
   const [status, setStatus] = useState<Status>("loading");
   const [room, setRoom] = useState<Room | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  const hasAutoJoined = useRef(false);
 
   useEffect(() => {
     (async () => {
@@ -72,6 +77,7 @@ export default function JoinRoomPage({
 
   async function join() {
     if (!room) return;
+    setStatus("joining");
     const supabase = createClient();
     const {
       data: { session },
@@ -85,6 +91,19 @@ export default function JoinRoomPage({
     setStatus("joined");
     setTimeout(() => router.push(`/leaderboard?room=${room.id}`), 900);
   }
+
+  // Reaching "ready" means: signed in, profile set up, room found, not yet
+  // a member. Clicking the invite link was already the confirmation to
+  // join, so this joins immediately instead of making them tap a second
+  // "Join room" button — that's what was silently swallowing the signup
+  // path before (onboarding used to drop the join code entirely and just
+  // send new users to /dashboard).
+  useEffect(() => {
+    if (status !== "ready" || hasAutoJoined.current) return;
+    hasAutoJoined.current = true;
+    join();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-6 text-center">
@@ -143,7 +162,11 @@ export default function JoinRoomPage({
               join &ldquo;{room.name}&rdquo;.
             </p>
             <button
-              onClick={() => router.push("/onboarding")}
+              onClick={() =>
+                router.push(
+                  `/onboarding?next=${encodeURIComponent(`/join/${code}`)}`
+                )
+              }
               className="mt-6 w-full rounded-2xl bg-foreground px-5 py-3.5 font-medium text-background"
             >
               Set up profile
@@ -151,18 +174,10 @@ export default function JoinRoomPage({
           </>
         )}
 
-        {room && status === "ready" && (
+        {room && (status === "ready" || status === "joining") && (
           <>
             <h1 className="text-xl font-semibold">Join &ldquo;{room.name}&rdquo;</h1>
-            <p className="mt-2 text-sm text-muted">
-              You&apos;ll share a leaderboard with everyone in this room.
-            </p>
-            <button
-              onClick={join}
-              className="mt-6 w-full rounded-2xl bg-foreground px-5 py-3.5 font-medium text-background transition active:scale-[0.98]"
-            >
-              Join room
-            </button>
+            <p className="mt-2 text-sm text-muted">Joining you in…</p>
           </>
         )}
 
