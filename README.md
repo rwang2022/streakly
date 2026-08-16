@@ -93,10 +93,10 @@ Anyone with no activity in 3+ days is flagged "slacking" on the leaderboard.
 
 ## What's next (v2 ideas)
 
-- Streak freezes (1 grace day/week)
-- Push notification reminders
 - Apple Health / Google Fit auto-import
 - Native App Store build via Capacitor (reuses this same codebase)
+- Per-user personalized push send time (needs a paid Vercel tier — see
+  the Push notifications section below for why Hobby can't do this)
 
 ## Updating an already-deployed project (rooms feature)
 
@@ -148,4 +148,175 @@ for non-creators, already worked via the existing membership policy). Run
 - **Faster-feeling navigation** — added skeleton loading states for
   Dashboard, Leaderboard, History, and Profile so switching screens shows
   something instantly instead of a blank flash.
+
+## Migration 5: close the activity backdating exploit
+
+RLS only ever checked *ownership* of an activity row, never whether its
+`logged_at` timestamp was plausible — anyone calling Supabase's REST API
+directly (dev tools, curl, a script using their own session) could insert
+an activity dated whenever they wanted and inflate their streak/consistency
+score. Run `supabase/migration_5_activity_date_guard.sql`: it adds a
+Postgres CHECK constraint restricting `logged_at` to `now() - 24h` through
+`now() + 5min`, enforced by the database itself regardless of how the
+insert request arrives. Added `not valid` so it doesn't choke on old rows
+— see the file for an example query to find/clean up existing bad data.
+
+Also fixed in this pass: server components run in UTC on Vercel regardless
+of the visiting person's real timezone, which was silently shifting which
+calendar day an activity landed on (especially in the evening, US
+timezones). `layout.tsx` now captures the browser's IANA timezone on load
+into a `streakly-tz` cookie, which `getRequestTimeZone()` reads server-side
+and threads through all day-bucketing logic (`lib/date.ts`, `lib/scoring.ts`,
+history/profile heatmaps).
+
+## Migration 6: rate-limit activity inserts
+
+Run `supabase/migration_6_rate_limit.sql`. A before-insert trigger rejects
+a new activity if the user already has 12+ logged in the last 24 hours —
+real defense-in-depth on top of the fraud heuristic below, enforced at the
+database level so it can't be bypassed by calling the API directly.
+
+## Migration 7: friend vouches
+
+Run `supabase/migration_7_vouches.sql`. Adds `activity_vouches` — see
+"Suspicious activity detection" below for what this is for.
+
+## Migration 8: push notification subscriptions
+
+Run `supabase/migration_8_push_subscriptions.sql`. Adds
+`push_subscriptions`, needed only if you set up push reminders (see
+below) — the app works fine without it.
+
+## Suspicious activity detection
+
+`lib/fraud.ts` flags two patterns that look like gamed data rather than
+genuine logging:
+
+1. A long run of consecutive days logged at the *exact same* high
+   duration (e.g. "300 min" five days straight) — real durations vary,
+   identical repeats don't.
+2. A burst of many activities all *created* within a short window,
+   regardless of what dates they claim to be logged on — someone
+   rapid-firing the log button to backfill a bunch of entries at once.
+
+A flagged account gets a flat **-100** applied to their score (deliberately
+uncapped, so it can go negative and actually sink their rank, not just
+reset them to a new-user baseline) and a "🚨 Busted" badge on the
+leaderboard. This is a heuristic, not proof — any friend or roommate
+(never the flagged person themselves) can vouch on that person's profile
+page that it's real, which clears the penalty (badge changes to "🤝
+Vouched") for 7 days. The flag itself stays visible either way; only the
+punishment is what vouching lifts.
+
+## Streak freezes
+
+One missed day per rolling 7-day window doesn't break a streak — same idea
+as Duolingo. The missed day itself still doesn't count toward the streak
+*number*, it just doesn't reset the chain. Shows as a small ❄️ wherever the
+streak is displayed. See `lib/scoring.ts` (`FREEZE_WINDOW_DAYS`) if you
+want to tune this.
+
+## Push notifications (optional)
+
+A daily "you haven't logged today" reminder, sent via Web Push. Entirely
+optional — everything else in the app works without it.
+
+**1. Run migration 8** (above) if you haven't.
+
+**2. Generate a VAPID key pair** (used to sign push messages so browsers
+trust they came from your server, not just anyone):
+
+```
+npx web-push generate-vapid-keys
+```
+
+**3. Get your Supabase service-role key.** In Supabase: **Project Settings
+→ API → service_role secret**. This is different from the anon key you
+already have — it bypasses row-level security, which the reminder cron
+job legitimately needs (it has to check *every* subscribed user's
+activity, not just one signed-in person's). Never expose this key to the
+browser; it only ever belongs in a server-side env var.
+
+**4. Generate a cron secret** — any random string works, e.g.:
+
+```
+openssl rand -hex 32
+```
+
+**5. Add these env vars in Vercel** (Project Settings → Environment
+Variables — not just `.env.local`, since the cron job runs on Vercel's
+infrastructure, not your machine):
+
+| Variable | Value |
+|---|---|
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | the "Public Key" from step 2 |
+| `VAPID_PRIVATE_KEY` | the "Private Key" from step 2 |
+| `VAPID_SUBJECT` | `mailto:you@example.com` (any contact, required by the push spec) |
+| `SUPABASE_SERVICE_ROLE_KEY` | the service-role key from step 3 |
+| `CRON_SECRET` | the random string from step 4 |
+
+Vercel automatically sends `CRON_SECRET` as a bearer token on cron-invoked
+requests once it's set — no extra config needed for that part.
+
+**6. Redeploy.** `vercel.json` already defines the schedule:
+
+```json
+{ "schedule": "0 1 * * *" }
+```
+
+That's 1am UTC daily — roughly 8-9pm US Eastern, 5-6pm US Pacific,
+depending on daylight saving. **Vercel's Hobby plan caps any single cron
+job at once per day** (a paid tier is required to run more often), so this
+one fixed UTC time is checked for everyone regardless of their own
+timezone — it can't personalize send time per person the way a proper
+notification system would on a paid plan. Adjust the hour in `vercel.json`
+if 1am UTC lands at an awkward time for your friend group.
+
+Once set up, anyone can turn reminders on/off from **Settings → Daily
+reminder**.
+
+## Testing
+
+```
+npm test
+```
+
+Runs the vitest suite covering `lib/scoring.ts` and `lib/fraud.ts` — the
+two most consequential pieces of pure logic in the app (they decide
+everyone's score and who gets penalized), so they're the ones worth
+having a safety net around.
+
+## Settings: data export & delete
+
+Both live under **Settings**. Export downloads a JSON file of your profile,
+activities, and friendships. Delete wipes your activities, friendships,
+room memberships, and any rooms you created, then signs you out — it
+deliberately leaves your account/profile row itself intact (so signing
+back in doesn't break), which makes it a data wipe rather than full account
+deletion. Full account deletion would need Supabase's admin API and a
+service-role key, which this app doesn't otherwise require.
+
+## What's new in this pass
+
+A big one — most of it prompted by "what would actually make this app
+succeed," not a single bug report:
+
+- **Tests** — `npm test` now covers the scoring and fraud-detection logic
+- **Streak freezes** — one missed day/week no longer kills a streak
+- **Rate limiting** — a hard per-day cap on activity inserts, enforced by
+  Postgres (migration 6)
+- **Vouching** — friends can clear a wrongly-flagged "sus" penalty instead
+  of it being a one-way, unappealable -100 (migration 7)
+- **Data export & delete** — see above
+- **Offline page** — a real fallback instead of a blank screen with no
+  connection
+- **Weekly recap** — a dashboard card comparing this week against friends
+- **Push reminders** — optional, see the Push notifications section above
+- Also: the room-scoped leaderboard now remembers which room you were on
+  when you tap into a friend's profile and go back (previously always
+  dropped you to the Friends tab); the #1 leaderboard spot gets a subtle
+  gold glow; the browser tab favicon now actually matches the app icon
+  instead of the default Next.js placeholder; the log-activity page now
+  surfaces insert errors instead of silently claiming success when a save
+  is rejected (e.g. by the rate limit or date-sanity check).
 
