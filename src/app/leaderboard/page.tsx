@@ -161,67 +161,21 @@ function MossBlob({
   );
 }
 
-// A fuller, more botanical laurel wreath: paired leaflets branching off a
-// curved stem that hugs the bottom of the avatar (~95°→260°, leaving the
-// top open for the crown), rather than a single ring of plain ellipses.
-// Verified at actual avatar scale as a mockup before porting the
-// coordinates here — a naive version of this reads as a blurry dotted
-// ring at small sizes rather than a wreath.
-function Laurel({ side }: { side: "left" | "right" }) {
-  const flip = side === "right";
-  const n = 9;
-  const stemPts: { x: number; y: number }[] = [];
-  const leaves: {
-    x: number;
-    y: number;
-    size: number;
-    rot: number;
-  }[] = [];
-
-  for (let i = 0; i < n; i++) {
-    const t = i / (n - 1);
-    const angDeg = lerp(95, 260, t);
-    const a = flip ? 180 - angDeg : angDeg;
-    const rad = (a * Math.PI) / 180;
-    const r = 1.14;
-    const x = Math.cos(rad) * r;
-    const y = Math.sin(rad) * r;
-    stemPts.push({ x, y });
-    const tangent = a + 90;
-    const leafSize = lerp(0.15, 0.24, t);
-    const perp = ((a + 90) * Math.PI) / 180;
-    for (const dir of [-1, 1]) {
-      const offX = Math.cos(perp) * leafSize * 0.65 * dir;
-      const offY = Math.sin(perp) * leafSize * 0.65 * dir;
-      const rot = tangent + dir * 20 + (flip ? 180 : 0);
-      leaves.push({ x: x + offX, y: y + offY, size: leafSize, rot });
-    }
-  }
-
-  const stemPath =
-    "M " + stemPts.map((p) => `${p.x.toFixed(3)} ${p.y.toFixed(3)}`).join(" L ");
-
+// A real laurel wreath graphic ("Gold Laurel Wreath" by Arvin61r58 via
+// Openclipart, CC0 — see public/laurel-wreath.svg) instead of a
+// hand-drawn approximation. Sized and offset against composited test
+// renders at the actual 88px avatar size: the wreath's natural gap sits
+// at the top (for the crown above it) and its small joining ornament
+// sits just past the avatar's bottom edge.
+function Laurel() {
   return (
-    <svg
-      viewBox="-1.3 -1.3 2.6 2.6"
+    <img
+      src="/laurel-wreath.svg"
+      alt=""
       aria-hidden
-      className="pointer-events-none absolute inset-0 h-full w-full"
-    >
-      <path d={stemPath} fill="none" stroke="#8a5a08" strokeWidth="0.02" opacity="0.8" />
-      {leaves.map((leaf, i) => (
-        <ellipse
-          key={i}
-          cx={leaf.x}
-          cy={leaf.y}
-          rx={leaf.size}
-          ry={leaf.size * 0.42}
-          fill="#c98a12"
-          stroke="#8a5a08"
-          strokeWidth="0.012"
-          transform={`rotate(${leaf.rot} ${leaf.x} ${leaf.y})`}
-        />
-      ))}
-    </svg>
+      className="pointer-events-none absolute select-none"
+      style={{ width: 190, left: -51, top: -54 }}
+    />
   );
 }
 
@@ -552,12 +506,6 @@ function Row({
       </div>
 
       <div className="relative shrink-0">
-        {isChampion && (
-          <>
-            <Laurel side="left" />
-            <Laurel side="right" />
-          </>
-        )}
         <div
           className={`flex items-center justify-center rounded-full font-semibold ${
             isChampion
@@ -579,6 +527,9 @@ function Row({
               .toUpperCase()
           )}
         </div>
+        {/* wreath renders after (on top of) the avatar so its leaves
+            overlap the avatar's outer edge slightly, like a real wreath */}
+        {isChampion && <Laurel />}
         {/* a hard diagonal slash across the avatar — "struck off", not
             just faded — for the caught-cheating case */}
         {isBusted && (
