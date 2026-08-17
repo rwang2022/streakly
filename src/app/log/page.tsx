@@ -25,8 +25,20 @@ export default function LogActivityPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function handleSave() {
-    setSaving(true);
     setError(null);
+
+    const parsedDuration = duration.trim() ? Number(duration) : null;
+    if (
+      parsedDuration !== null &&
+      (!Number.isFinite(parsedDuration) ||
+        parsedDuration < 0 ||
+        parsedDuration > 1000)
+    ) {
+      setError("Duration has to be between 0 and 1000 minutes.");
+      return;
+    }
+
+    setSaving(true);
     const supabase = createClient();
     const {
       data: { session },
@@ -45,7 +57,7 @@ export default function LogActivityPage() {
     const { error: insertError } = await supabase.from("activities").insert({
       user_id: user.id,
       type,
-      duration_minutes: duration ? Number(duration) : null,
+      duration_minutes: parsedDuration,
       note: note || null,
       logged_at: new Date().toISOString(),
     });
@@ -56,6 +68,8 @@ export default function LogActivityPage() {
       setError(
         insertError.message.includes("Too many activities")
           ? "You've hit today's logging limit. Try again tomorrow."
+          : insertError.message.includes("duration_minutes")
+          ? "Duration has to be between 0 and 1000 minutes."
           : "Couldn't save that. Try again in a moment."
       );
       return;
@@ -98,6 +112,8 @@ export default function LogActivityPage() {
         <input
           type="number"
           inputMode="numeric"
+          min={0}
+          max={1000}
           value={duration}
           onChange={(e) => setDuration(e.target.value)}
           placeholder="30"

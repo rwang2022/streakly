@@ -366,3 +366,15 @@ create policy "users manage their own push subscriptions"
 
 alter table public.profiles
   add column if not exists is_admin boolean not null default false;
+
+-- Migration 10: bound duration_minutes to a sane range (0-1000, NULL
+-- still allowed for the optional field) — same client-side-only-limit
+-- problem as migration 5's logged_at guard, closed the same way with a
+-- database-level CHECK. See migration_10_duration_bound.sql.
+
+alter table public.activities
+  add constraint activities_duration_reasonable
+  check (
+    duration_minutes is null
+    or (duration_minutes >= 0 and duration_minutes <= 1000)
+  ) not valid;

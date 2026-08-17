@@ -206,6 +206,13 @@ Then, with that id:
 update public.profiles set is_admin = true where id = '<your-user-id>';
 ```
 
+## Migration 10: bound activity duration
+
+Run `supabase/migration_10_duration_bound.sql`. Adds a CHECK constraint
+so `duration_minutes` on `activities` has to be between 0 and 1000 (or
+NULL, since it's an optional field) — closes the same
+client-side-only-limit gap as migration 5's `logged_at` guard.
+
 ## Suspicious activity detection
 
 `lib/fraud.ts` flags two patterns that look like gamed data rather than
