@@ -67,22 +67,32 @@ export default function FriendsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // People naturally type "@username" here — that's how a username is
+  // *displayed* everywhere else in the app — but the stored column never
+  // has the "@" in it. Without stripping it, "%@hunterskun%" can never
+  // match a stored "hunterskun", so a search that looks exactly right
+  // silently returns nothing, while a plain substring like "nk" works
+  // fine — which is exactly the "flipped"/backwards feeling being
+  // reported. Stripped once here so every downstream use (the query
+  // itself and the length gate below) agrees on the same cleaned string.
+  const cleanedQuery = query.trim().replace(/^@/, "");
+
   useEffect(() => {
-    if (!myId || query.trim().length < 2) return;
+    if (!myId || cleanedQuery.length < 2) return;
     const handle = setTimeout(async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("*")
-        .ilike("username", `%${query.trim()}%`)
+        .select("id, username, display_name, avatar_url")
+        .ilike("username", `%${cleanedQuery}%`)
         .neq("id", myId)
         .not("username", "is", null)
         .limit(10);
       setResults((data ?? []) as Profile[]);
     }, 250);
     return () => clearTimeout(handle);
-  }, [query, myId, supabase]);
+  }, [cleanedQuery, myId, supabase]);
 
-  const visibleResults = query.trim().length < 2 ? [] : results;
+  const visibleResults = cleanedQuery.length < 2 ? [] : results;
 
   const accepted = friendships.filter((f) => f.status === "accepted");
   const incoming = friendships.filter(

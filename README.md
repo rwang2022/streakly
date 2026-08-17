@@ -222,6 +222,23 @@ automatic heuristic in `lib/fraud.ts`. Same -100 penalty and badge as an
 algorithmic flag, but a friend/admin vouch never clears it — only an
 admin removing the flag does. See "Suspicious activity detection" below.
 
+## Migration 12: room lookup lockdown (security fix)
+
+Run `supabase/migration_12_room_lookup_lockdown.sql`. Closes a real hole:
+`rooms` had been readable by *anyone* — including fully unauthenticated
+requests hitting Supabase's REST API directly, no app or login required
+— since migration 2. That meant every room's name and invite code (a
+join token — whoever has it can join the room and see members' activity)
+could be dumped from the whole table in one request, bypassing the
+"shared via a link" model entirely.
+
+This locks `rooms` SELECT down to members only, and moves the
+join-by-code lookup (used by both `/join/<code>` and the "enter a code"
+box on the Rooms page) to a `SECURITY DEFINER` function,
+`get_room_by_invite_code`, that returns just `(id, name)` for the one
+matching room — never the invite_code itself, never any other room.
+**Run this one even if you don't care about the other migrations.**
+
 ## Suspicious activity detection
 
 `lib/fraud.ts` flags two patterns that look like gamed data rather than

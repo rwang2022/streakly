@@ -112,11 +112,13 @@ export default function RoomsPage() {
     setJoining(true);
 
     const code = joinCode.trim().toUpperCase();
-    const { data: room } = await supabase
-      .from("rooms")
-      .select("*")
-      .eq("invite_code", code)
-      .maybeSingle();
+    // Members-only RLS on `rooms` (migration_12) means a direct table
+    // select can't see a room you haven't joined yet — this RPC is the
+    // sanctioned lookup path for "I have a code, what room is it".
+    const { data: roomRows } = await supabase.rpc("get_room_by_invite_code", {
+      code,
+    });
+    const room = roomRows?.[0] ?? null;
 
     if (!room) {
       setError("No room found for that code.");

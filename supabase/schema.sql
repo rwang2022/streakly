@@ -431,3 +431,27 @@ create policy "admins can remove a flag"
   using (
     exists (select 1 from public.profiles where id = auth.uid() and is_admin)
   );
+
+-- Migration 12: stop leaking every room (name + invite code) to anyone,
+-- including unauthenticated requests hitting the REST API directly. See
+-- migration_12_room_lookup_lockdown.sql for the full rationale.
+
+drop policy if exists "rooms are readable by anyone" on public.rooms;
+
+create policy "rooms are readable by members"
+  on public.rooms for select
+  to authenticated
+  using (public.is_room_member(auth.uid(), id));
+
+create or replace function public.get_room_by_invite_code(code text)
+returns table (id uuid, name text)
+language sql
+stable
+security definer set search_path = public
+as $$
+  select r.id, r.name
+  from public.rooms r
+  where r.invite_code = code;
+$$;
+
+grant execute on function public.get_room_by_invite_code(text) to anon, authenticated;

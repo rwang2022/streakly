@@ -4,7 +4,16 @@ import { useEffect, useRef, useState, use as usePromise } from "react";
 import { useRouter } from "next/navigation";
 import { Users, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import type { Room } from "@/lib/types";
+
+// Only what the preview screen actually needs — get_room_by_invite_code()
+// (a SECURITY DEFINER RPC, see migration_12) deliberately returns just
+// this, not the full Room row, so an anonymous visitor previewing one
+// invite link can't be handed the invite_code (or any other room's data)
+// back in the response.
+interface RoomPreview {
+  id: string;
+  name: string;
+}
 
 // "ready" is a brief transitional state (auto-joins immediately, see the
 // effect below) rather than something the person has to click through —
@@ -20,7 +29,7 @@ export default function JoinRoomPage({
   const { code } = usePromise(params);
   const router = useRouter();
   const [status, setStatus] = useState<Status>("loading");
-  const [room, setRoom] = useState<Room | null>(null);
+  const [room, setRoom] = useState<RoomPreview | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
   const hasAutoJoined = useRef(false);
 
@@ -29,11 +38,10 @@ export default function JoinRoomPage({
       const supabase = createClient();
       const normalized = decodeURIComponent(code).toUpperCase();
 
-      const { data: roomRow, error: roomError } = await supabase
-        .from("rooms")
-        .select("*")
-        .eq("invite_code", normalized)
-        .maybeSingle();
+      const { data: roomRows, error: roomError } = await supabase.rpc(
+        "get_room_by_invite_code",
+        { code: normalized }
+      );
 
       if (roomError) {
         console.error("join lookup failed:", roomError);
@@ -41,11 +49,12 @@ export default function JoinRoomPage({
         setStatus("error");
         return;
       }
+      const roomRow = roomRows?.[0] ?? null;
       if (!roomRow) {
         setStatus("not-found");
         return;
       }
-      setRoom(roomRow as Room);
+      setRoom(roomRow);
 
       const {
         data: { session },
