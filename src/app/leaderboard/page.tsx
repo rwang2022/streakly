@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Crown, Flag, Flame, Settings2, Skull, Star } from "lucide-react";
+import { Crown, Flag, Flame, Medal, Settings2, Skull, Star } from "lucide-react";
 import { getLeaderboard, getMyRooms } from "@/lib/leaderboard";
 import { BottomNav } from "@/components/BottomNav";
 import { ScoreInfo } from "@/components/ScoreInfo";
@@ -403,6 +403,14 @@ function Row({
   // also inactive) shouldn't get a celebratory glow layered on top of a
   // dashed "you're slacking"/"busted" state.
   const isChampion = rank === 1 && !isBusted && !entry.isSlacking;
+  // Same "actually earned it" guard as the champion glow — a busted or
+  // slacking account sitting at #2-4 shouldn't also get a shiny medal.
+  const isSilver = rank === 2 && !isBusted && !entry.isSlacking;
+  const isBronze = rank === 3 && !isBusted && !entry.isSlacking;
+  // Not a real podium spot — just a joke "wood medal" for 4th place
+  // (missed the podium by one), same color family as an actual wooden
+  // medal you'd get as a gag prize.
+  const isWood = rank === 4 && !isBusted && !entry.isSlacking;
 
   // The very last "gone quiet" row gets a literal tombstone instead of
   // just fading — everyone above it in that tier decays progressively
@@ -591,11 +599,29 @@ function Row({
 
       <div
         className={`flex w-6 shrink-0 items-center justify-center text-sm font-medium ${
-          isChampion ? "text-amber-500" : "text-muted"
+          isChampion
+            ? "text-amber-500"
+            : isSilver
+            ? "text-slate-400"
+            : isBronze
+            ? "text-amber-700"
+            : isWood
+            ? "text-[#8b5a2b]"
+            : "text-muted"
         }`}
       >
         {isChampion ? (
           <Crown size={18} className="fill-amber-400 text-amber-500" />
+        ) : isSilver ? (
+          <Medal size={17} className="fill-slate-300 text-slate-400" />
+        ) : isBronze ? (
+          <Medal size={17} className="fill-amber-600 text-amber-700" />
+        ) : isWood ? (
+          <Medal
+            size={17}
+            className="fill-[#a97142] text-[#6b4423]"
+            aria-label="Wood medal — just missed the podium"
+          />
         ) : (
           rank
         )}
@@ -615,6 +641,14 @@ function Row({
               ? "bg-surface-2 opacity-40 grayscale"
               : !isChampion
               ? "bg-surface-2"
+              : ""
+          } ${
+            isSilver
+              ? "ring-2 ring-slate-300 ring-offset-2 ring-offset-surface"
+              : isBronze
+              ? "ring-2 ring-amber-700 ring-offset-2 ring-offset-surface"
+              : isWood
+              ? "border-2 border-dashed border-[#8b5a2b]"
               : ""
           }`}
         >

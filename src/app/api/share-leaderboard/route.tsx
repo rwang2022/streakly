@@ -39,6 +39,7 @@ function medalColor(rank: number) {
   if (rank === 1) return GOLD;
   if (rank === 2) return "#c9c9cf";
   if (rank === 3) return "#c98a4a";
+  if (rank === 4) return "#8b5a2b"; // joke "wood medal" for 4th
   return "#98989d";
 }
 
