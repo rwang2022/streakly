@@ -34,7 +34,7 @@ export default function LogActivityPage() {
         parsedDuration < 0 ||
         parsedDuration > 1000)
     ) {
-      setError("Duration has to be between 0 and 1000 minutes.");
+      setError("Minutes must be >= 0 and <= 1000.");
       return;
     }
 
@@ -69,7 +69,7 @@ export default function LogActivityPage() {
         insertError.message.includes("Too many activities")
           ? "You've hit today's logging limit. Try again tomorrow."
           : insertError.message.includes("duration_minutes")
-          ? "Duration has to be between 0 and 1000 minutes."
+          ? "Minutes must be >= 0 and <= 1000."
           : "Couldn't save that. Try again in a moment."
       );
       return;
