@@ -598,32 +598,33 @@ function Row({
       )}
 
       <div
-        className={`flex w-6 shrink-0 items-center justify-center text-sm font-medium ${
-          isChampion
-            ? "text-amber-500"
-            : isSilver
-            ? "text-slate-400"
-            : isBronze
-            ? "text-amber-700"
-            : isWood
-            ? "text-[#8b5a2b]"
-            : "text-muted"
+        className={`flex w-6 shrink-0 items-center justify-center ${
+          isChampion ? "text-amber-500" : "text-muted"
         }`}
       >
         {isChampion ? (
           <Crown size={18} className="fill-amber-400 text-amber-500" />
         ) : isSilver ? (
-          <Medal size={17} className="fill-slate-300 text-slate-400" />
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-slate-100 via-slate-300 to-slate-500 shadow-sm shadow-black/40 ring-1 ring-white/60">
+            <Medal size={13} strokeWidth={2.5} className="text-slate-800" />
+          </span>
         ) : isBronze ? (
-          <Medal size={17} className="fill-amber-600 text-amber-700" />
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 via-amber-600 to-amber-800 shadow-sm shadow-black/40 ring-1 ring-amber-200/60">
+            <Medal size={13} strokeWidth={2.5} className="text-amber-950" />
+          </span>
         ) : isWood ? (
-          <Medal
-            size={17}
-            className="fill-[#a97142] text-[#6b4423]"
+          <span
             aria-label="Wood medal — just missed the podium"
-          />
+            className="flex h-6 w-6 items-center justify-center rounded-full shadow-sm shadow-black/40 ring-1 ring-black/20"
+            style={{
+              background:
+                "repeating-linear-gradient(115deg, #a9713f 0px, #a9713f 3px, #7a4d26 3px, #7a4d26 6px)",
+            }}
+          >
+            <Medal size={13} strokeWidth={2.5} className="text-[#3f2712]" />
+          </span>
         ) : (
-          rank
+          <span className="text-sm font-medium">{rank}</span>
         )}
       </div>
 
@@ -635,22 +636,30 @@ function Row({
           className={`flex items-center justify-center rounded-full font-semibold ${
             isChampion
               ? "h-[88px] w-[88px] text-3xl bg-gradient-to-br from-amber-300 to-amber-500 text-white ring-[3px] ring-amber-300/70 ring-offset-2 ring-offset-surface"
+              : isSilver || isBronze || isWood
+              ? "h-12 w-12 text-base text-white"
               : "h-10 w-10 text-sm"
           } ${
             isBusted || isDecaying
               ? "bg-surface-2 opacity-40 grayscale"
+              : isSilver
+              ? "bg-gradient-to-br from-slate-300 via-slate-400 to-slate-600 shadow-md shadow-slate-400/40 ring-[3px] ring-slate-200 ring-offset-2 ring-offset-surface"
+              : isBronze
+              ? "bg-gradient-to-br from-amber-500 via-amber-700 to-amber-900 shadow-md shadow-amber-800/40 ring-[3px] ring-amber-500 ring-offset-2 ring-offset-surface"
+              : isWood
+              ? "shadow-md shadow-black/30 border-[3px] border-dashed border-[#5c3a1e] -rotate-3"
               : !isChampion
               ? "bg-surface-2"
               : ""
-          } ${
-            isSilver
-              ? "ring-2 ring-slate-300 ring-offset-2 ring-offset-surface"
-              : isBronze
-              ? "ring-2 ring-amber-700 ring-offset-2 ring-offset-surface"
-              : isWood
-              ? "border-2 border-dashed border-[#8b5a2b]"
-              : ""
           }`}
+          style={
+            isWood
+              ? {
+                  background:
+                    "repeating-linear-gradient(115deg, #b9814c 0px, #b9814c 5px, #8a5a30 5px, #8a5a30 10px)",
+                }
+              : undefined
+          }
         >
           {isDecaying && decayT > 0.5 ? (
             <Skull size={16} />
