@@ -213,6 +213,15 @@ so `duration_minutes` on `activities` has to be between 0 and 1000 (or
 NULL, since it's an optional field) — closes the same
 client-side-only-limit gap as migration 5's `logged_at` guard.
 
+## Migration 11: manual mod flags
+
+Run `supabase/migration_11_manual_flags.sql`. Adds a `manual_flags`
+table so an admin (`is_admin = true`, see Migration 9) can flag someone
+as suspicious directly from their profile page, independent of the
+automatic heuristic in `lib/fraud.ts`. Same -100 penalty and badge as an
+algorithmic flag, but a friend/admin vouch never clears it — only an
+admin removing the flag does. See "Suspicious activity detection" below.
+
 ## Suspicious activity detection
 
 `lib/fraud.ts` flags two patterns that look like gamed data rather than
@@ -236,6 +245,16 @@ actually clears the penalty (badge changes to "🤝 Vouched") for 7 days —
 see Migration 9 above for how to make yourself an admin. The flag itself
 stays visible either way; only the punishment is what an admin's vouch
 lifts.
+
+On top of the heuristic, an admin can also flag someone directly — for
+judgment calls the pattern-matching can't see (someone admits to fudging
+a log, say). This shows the same "🚨 Busted" badge and -100 penalty, but
+lives in a separate `manual_flags` table (Migration 11) and is *not*
+cleared by anyone vouching, admin or otherwise — vouches only ever
+address the algorithmic side. Only an admin removing the flag (the same
+button toggles back to "Flag as suspicious") lifts a manual flag. If
+someone is flagged both ways at once, vouching clears the algorithmic
+half but the manual flag alone keeps the penalty in place.
 
 ## Streak freezes
 

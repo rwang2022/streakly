@@ -5,9 +5,11 @@ import { getCachedUser, getRequestTimeZone } from "@/lib/auth";
 import { computeScore } from "@/lib/scoring";
 import { detectSuspiciousPattern } from "@/lib/fraud";
 import { getAdminUserIds, isVouchFresh } from "@/lib/vouches";
+import { getManualFlags, combineSuspicion } from "@/lib/moderation";
 import { getBadge } from "@/lib/badges";
 import { BottomNav } from "@/components/BottomNav";
 import { VouchButton } from "@/components/VouchButton";
+import { ModFlagButton } from "@/components/ModFlagButton";
 import type { Activity } from "@/lib/types";
 import { daysAgoIso, formatDateKey, formatDisplayDate } from "@/lib/date";
 
@@ -91,6 +93,12 @@ export default async function ProfilePage({
   const scoreResult = computeScore(activities, new Date(), timeZone);
   const suspicion = detectSuspiciousPattern(activities, timeZone);
 
+  // Fetched unconditionally (not just "if suspicious") since it's also
+  // used below to decide whether *this viewer* gets the mod flag button,
+  // regardless of whether the profile is currently flagged at all.
+  const adminIds = user ? await getAdminUserIds() : new Set<string>();
+  const viewerIsAdmin = Boolean(user && adminIds.has(user.id));
+
   // Has a friend/roommate vouched this is real? Only matters if something
   // was actually flagged. Fetched as raw rows (not just a boolean) so we
   // can also tell whether *this viewer* is the one who vouched, for the
@@ -102,13 +110,24 @@ export default async function ProfilePage({
           .select("vouched_by, created_at")
           .eq("user_id", id)
       : { data: [] as { vouched_by: string; created_at: string }[] };
+  const manualFlags = hasAccess ? await getManualFlags([id]) : [];
+  const manualFlag = manualFlags[0] ?? null;
   const activeVouches = (vouchRows ?? []).filter((v) => isVouchFresh(v.created_at));
   // Anyone can vouch and everyone who has is shown/credited below, but only
-  // an admin's vouch actually lifts the penalty — see lib/vouches.ts.
-  const adminIds = suspicion.suspicious ? await getAdminUserIds() : new Set<string>();
-  const isVouched = activeVouches.some((v) => adminIds.has(v.vouched_by));
+  // an admin's vouch actually lifts the *heuristic* side — see
+  // lib/vouches.ts. A manual mod flag is separate and isn't cleared by a
+  // vouch at all; only an admin removing the flag lifts it (ModFlagButton).
+  const heuristicClearedByVouch =
+    suspicion.suspicious && activeVouches.some((v) => adminIds.has(v.vouched_by));
+  const { isSuspicious, isVouched } = combineSuspicion({
+    heuristicSuspicious: suspicion.suspicious,
+    heuristicReason: suspicion.reason,
+    heuristicClearedByVouch,
+    manualFlag,
+  });
   const myVouch = activeVouches.some((v) => v.vouched_by === user?.id);
-  const hasNonAdminVouches = activeVouches.length > 0 && !isVouched;
+  const hasNonAdminVouches =
+    activeVouches.length > 0 && !heuristicClearedByVouch;
 
   const voucherIds = activeVouches.map((v) => v.vouched_by);
   const { data: voucherProfiles } =
@@ -122,14 +141,23 @@ export default async function ProfilePage({
     .map((p) => p.display_name ?? `@${p.username}`)
     .join(", ");
 
+  let flaggerName: string | null = null;
+  if (manualFlag) {
+    const { data: flagger } = await supabase
+      .from("profiles")
+      .select("display_name, username")
+      .eq("id", manualFlag.flaggedBy)
+      .single();
+    flaggerName = flagger
+      ? flagger.display_name ?? `@${flagger.username}`
+      : null;
+  }
+
   // Same flat -100 penalty applied on the leaderboard, uncapped so it can
   // go negative — see lib/leaderboard.ts for the rationale. Suppressed only
-  // once an admin specifically has vouched — a pile of non-admin vouches
-  // alone still leaves the flag (and penalty) in place.
+  // once nothing is currently holding a penalty (isVouched — see above).
   const displayScore =
-    suspicion.suspicious && !isVouched
-      ? scoreResult.score - 100
-      : scoreResult.score;
+    isSuspicious && !isVouched ? scoreResult.score - 100 : scoreResult.score;
   const activeDates = new Set(
     activities.map((a) => formatDateKey(new Date(a.logged_at), timeZone))
   );
@@ -192,29 +220,17 @@ export default async function ProfilePage({
             <div className="mt-6 flex items-center justify-center">
               <span
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
-                  suspicion.suspicious && !isVouched
+                  isSuspicious && !isVouched
                     ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                    : suspicion.suspicious && isVouched
+                    : isSuspicious && isVouched
                     ? "bg-success/15 text-success"
                     : scoreResult.isSlacking
                     ? "bg-accent-2/15 text-accent-2"
                     : "bg-surface-2 text-muted"
                 }`}
               >
-                {
-                  getBadge({
-                    ...scoreResult,
-                    isSuspicious: suspicion.suspicious,
-                    isVouched,
-                  }).emoji
-                }{" "}
-                {
-                  getBadge({
-                    ...scoreResult,
-                    isSuspicious: suspicion.suspicious,
-                    isVouched,
-                  }).label
-                }
+                {getBadge({ ...scoreResult, isSuspicious, isVouched }).emoji}{" "}
+                {getBadge({ ...scoreResult, isSuspicious, isVouched }).label}
               </span>
             </div>
 
@@ -228,7 +244,29 @@ export default async function ProfilePage({
               <Stat label="Active/30d" value={String(scoreResult.activeDaysLast30)} />
             </div>
 
-            {suspicion.suspicious && !isVouched && (
+            {/* A manual mod flag takes priority over the heuristic banners
+                below — it's not something a vouch can clear, so it needs
+                its own message rather than being folded into the "vouch to
+                clear this" copy. If both happen to apply at once, the
+                heuristic's reason is appended as an extra note. */}
+            {manualFlag && (
+              <div className="mt-4 flex items-start gap-2 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-xs text-accent">
+                <Flag size={14} className="mt-0.5 shrink-0" />
+                <p>
+                  <span className="font-medium">
+                    -100 penalty applied — flagged by a mod
+                  </span>
+                  {flaggerName ? ` (${flaggerName})` : ""}
+                  {manualFlag.reason ? `: ${manualFlag.reason}` : "."}{" "}
+                  {suspicion.suspicious &&
+                    `Also flagged automatically: ${suspicion.reason}. `}
+                  Only an admin can remove this flag — vouching doesn&apos;t
+                  clear it.
+                </p>
+              </div>
+            )}
+
+            {!manualFlag && suspicion.suspicious && !isVouched && (
               <div className="mt-4 flex items-start gap-2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-700 dark:text-amber-400">
                 <Flag size={14} className="mt-0.5 shrink-0" />
                 <p>
@@ -243,7 +281,7 @@ export default async function ProfilePage({
               </div>
             )}
 
-            {suspicion.suspicious && isVouched && (
+            {!manualFlag && suspicion.suspicious && isVouched && (
               <div className="mt-4 flex items-start gap-2 rounded-2xl border border-success/30 bg-success/10 px-4 py-3 text-xs text-success">
                 <Handshake size={14} className="mt-0.5 shrink-0" />
                 <p>
@@ -257,6 +295,14 @@ export default async function ProfilePage({
 
             {hasAccess && !isSelf && suspicion.suspicious && (
               <VouchButton targetUserId={id} initiallyVouched={myVouch} />
+            )}
+
+            {hasAccess && !isSelf && viewerIsAdmin && (
+              <ModFlagButton
+                targetUserId={id}
+                initiallyFlagged={Boolean(manualFlag)}
+                initialReason={manualFlag?.reason ?? null}
+              />
             )}
 
             <p className="mt-8 text-sm font-medium text-muted">

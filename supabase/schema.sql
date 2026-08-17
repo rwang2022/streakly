@@ -378,3 +378,56 @@ alter table public.activities
     duration_minutes is null
     or (duration_minutes >= 0 and duration_minutes <= 1000)
   ) not valid;
+
+-- Migration 11: let an admin manually flag someone as suspicious — a
+-- persistent, single-row-per-user flag separate from (and not clearable
+-- by) the friend-vouch system. See migration_11_manual_flags.sql for the
+-- full rationale.
+
+create table if not exists public.manual_flags (
+  user_id uuid primary key references public.profiles(id) on delete cascade,
+  flagged_by uuid not null references public.profiles(id) on delete cascade,
+  reason text,
+  created_at timestamptz not null default now(),
+  constraint no_self_flag check (user_id <> flagged_by)
+);
+
+alter table public.manual_flags enable row level security;
+
+create policy "flags visible to the people involved"
+  on public.manual_flags for select
+  to authenticated
+  using (
+    auth.uid() = user_id
+    or auth.uid() = flagged_by
+    or public.is_friend(auth.uid(), user_id)
+    or public.share_room(auth.uid(), user_id)
+  );
+
+create policy "admins can flag"
+  on public.manual_flags for insert
+  to authenticated
+  with check (
+    auth.uid() = flagged_by
+    and auth.uid() <> user_id
+    and exists (
+      select 1 from public.profiles where id = auth.uid() and is_admin
+    )
+  );
+
+create policy "admins can update a flag"
+  on public.manual_flags for update
+  to authenticated
+  using (
+    exists (select 1 from public.profiles where id = auth.uid() and is_admin)
+  )
+  with check (
+    exists (select 1 from public.profiles where id = auth.uid() and is_admin)
+  );
+
+create policy "admins can remove a flag"
+  on public.manual_flags for delete
+  to authenticated
+  using (
+    exists (select 1 from public.profiles where id = auth.uid() and is_admin)
+  );

@@ -3,6 +3,7 @@ import { getCachedUser, getRequestTimeZone } from "@/lib/auth";
 import { computeScore } from "@/lib/scoring";
 import { detectSuspiciousPattern } from "@/lib/fraud";
 import { getVouchedUserIds } from "@/lib/vouches";
+import { getManualFlags, combineSuspicion } from "@/lib/moderation";
 import type { Activity, LeaderboardEntry, Profile, Room } from "@/lib/types";
 
 type ScoringActivity = Pick<
@@ -56,7 +57,7 @@ export async function getLeaderboard(roomId?: string): Promise<{
     memberIds = Array.from(new Set([user.id, ...friendIds]));
   }
 
-  const [{ data: profiles }, { data: activities }, vouchedUserIds] =
+  const [{ data: profiles }, { data: activities }, vouchedUserIds, manualFlags] =
     await Promise.all([
       supabase
         .from("profiles")
@@ -74,7 +75,10 @@ export async function getLeaderboard(roomId?: string): Promise<{
           new Date(Date.now() - LOOKBACK_DAYS * 86400000).toISOString()
         ),
       getVouchedUserIds(memberIds),
+      getManualFlags(memberIds),
     ]);
+
+  const manualFlagByUser = new Map(manualFlags.map((f) => [f.userId, f]));
 
   const activitiesByUser = new Map<string, ScoringActivity[]>();
   for (const a of (activities ?? []) as ScoringActivity[]) {
@@ -88,16 +92,25 @@ export async function getLeaderboard(roomId?: string): Promise<{
       const userActivities = activitiesByUser.get(profile.id) ?? [];
       const result = computeScore(userActivities, new Date(), timeZone);
       const suspicion = detectSuspiciousPattern(userActivities, timeZone);
-      const isVouched = suspicion.suspicious && vouchedUserIds.has(profile.id);
+      const manualFlag = manualFlagByUser.get(profile.id) ?? null;
+      const heuristicClearedByVouch =
+        suspicion.suspicious && vouchedUserIds.has(profile.id);
+      const combined = combineSuspicion({
+        heuristicSuspicious: suspicion.suspicious,
+        heuristicReason: suspicion.reason,
+        heuristicClearedByVouch,
+        manualFlag,
+      });
       // Flat -100 penalty, deliberately not clamped back to 0 — the whole
       // point is it visibly wrecks your rank (drops you below everyone,
       // even someone slacking), not just resets you to where a brand new
-      // user would start. Suppressed only once an admin specifically has
-      // vouched (getVouchedUserIds already filters to admin-sourced vouches
-      // — see lib/vouches.ts): the flag itself stays visible (transparency),
-      // just not the punishment.
+      // user would start. Suppressed only once nothing is holding a
+      // penalty in place (see combineSuspicion): the flag itself stays
+      // visible (transparency), just not the punishment.
       const score =
-        suspicion.suspicious && !isVouched ? result.score - 100 : result.score;
+        combined.isSuspicious && !combined.isVouched
+          ? result.score - 100
+          : result.score;
       return {
         profile,
         score,
@@ -109,9 +122,9 @@ export async function getLeaderboard(roomId?: string): Promise<{
         isSlacking: result.isSlacking,
         isMe: profile.id === user.id,
         lastActiveDate: result.lastActiveDate,
-        isSuspicious: suspicion.suspicious,
-        suspicionReason: suspicion.reason,
-        isVouched,
+        isSuspicious: combined.isSuspicious,
+        suspicionReason: combined.suspicionReason,
+        isVouched: combined.isVouched,
         usedStreakFreeze: result.usedStreakFreeze,
       };
     }
