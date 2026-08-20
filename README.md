@@ -239,6 +239,26 @@ box on the Rooms page) to a `SECURITY DEFINER` function,
 matching room — never the invite_code itself, never any other room.
 **Run this one even if you don't care about the other migrations.**
 
+## Migration 13: flag timers + admin activity deletion
+
+Run `supabase/migration_13_flag_timer_and_admin_delete.sql`. Two
+independent additions:
+
+1. `manual_flags.expires_at` (nullable) — a manual flag (Migration 11)
+   can now be given a duration instead of only ever being permanent.
+   Set it when flagging someone, or change it later with "Edit time" on
+   an already-flagged profile. `NULL` still means permanent. Once
+   `expires_at` passes, the flag stops counting toward the -100 penalty
+   automatically — `lib/moderation.ts`'s `getManualFlags()` filters
+   expired rows out at the query level, so nothing else in the app needs
+   to know or check.
+2. A new `activities` DELETE policy letting an admin (`is_admin = true`)
+   remove a single fraudulent entry from *anyone's* history, not just
+   their own. Shows up as a small trash-can button on each activity row
+   on a profile page, admin-only. This is a scalpel next to the -100
+   penalty's sledgehammer — useful when only one or two logged entries
+   are actually fake and the rest of someone's history is legit.
+
 ## Suspicious activity detection
 
 `lib/fraud.ts` flags two patterns that look like gamed data rather than

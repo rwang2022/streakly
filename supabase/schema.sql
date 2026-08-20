@@ -455,3 +455,17 @@ as $$
 $$;
 
 grant execute on function public.get_room_by_invite_code(text) to anon, authenticated;
+
+-- Migration 13: optional expiry on manual mod flags, and letting an admin
+-- delete another user's individual fraudulent activity entries. See
+-- migration_13_flag_timer_and_admin_delete.sql for the full rationale.
+
+alter table public.manual_flags
+  add column if not exists expires_at timestamptz;
+
+create policy "admins can delete any activity"
+  on public.activities for delete
+  to authenticated
+  using (
+    exists (select 1 from public.profiles where id = auth.uid() and is_admin)
+  );

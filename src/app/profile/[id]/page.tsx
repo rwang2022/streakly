@@ -10,6 +10,7 @@ import { getBadge } from "@/lib/badges";
 import { BottomNav } from "@/components/BottomNav";
 import { VouchButton } from "@/components/VouchButton";
 import { ModFlagButton } from "@/components/ModFlagButton";
+import { DeleteActivityButton } from "@/components/DeleteActivityButton";
 import type { Activity } from "@/lib/types";
 import { daysAgoIso, formatDateKey, formatDisplayDate } from "@/lib/date";
 
@@ -260,8 +261,12 @@ export default async function ProfilePage({
                   {manualFlag.reason ? `: ${manualFlag.reason}` : "."}{" "}
                   {suspicion.suspicious &&
                     `Also flagged automatically: ${suspicion.reason}. `}
-                  Only an admin can remove this flag — vouching doesn&apos;t
-                  clear it.
+                  {manualFlag.expiresAt
+                    ? `Lifts automatically on ${new Date(
+                        manualFlag.expiresAt
+                      ).toLocaleDateString()}. `
+                    : "Permanent until an admin removes it. "}
+                  Vouching doesn&apos;t clear it.
                 </p>
               </div>
             )}
@@ -302,6 +307,7 @@ export default async function ProfilePage({
                 targetUserId={id}
                 initiallyFlagged={Boolean(manualFlag)}
                 initialReason={manualFlag?.reason ?? null}
+                initialExpiresAt={manualFlag?.expiresAt ?? null}
               />
             )}
 
@@ -360,6 +366,15 @@ export default async function ProfilePage({
                       {a.note ? ` · ${a.note}` : ""}
                     </p>
                   </div>
+                  {/* Lets an admin remove a specific fraudulent-looking
+                      entry (e.g. one of the identical-duration or burst
+                      rows flagged above) without resorting to the blunt
+                      whole-account -100 penalty. Relies on the same RLS
+                      policy (migration 13) that actually enforces this —
+                      this button is just the UI for it. */}
+                  {viewerIsAdmin && !isSelf && (
+                    <DeleteActivityButton activityId={a.id} />
+                  )}
                 </div>
               ))}
             </div>

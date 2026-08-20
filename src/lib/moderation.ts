@@ -5,6 +5,7 @@ export interface ManualFlag {
   flaggedBy: string;
   reason: string | null;
   createdAt: string;
+  expiresAt: string | null;
 }
 
 export interface CombinedSuspicion {
@@ -65,19 +66,25 @@ export function combineSuspicion({
  * one per voucher), manual_flags has at most one row per user, so this
  * doubles as "who flagged them and why" for the profile page and "which
  * of these ids are flagged" for the leaderboard.
+ *
+ * Expired flags (expires_at in the past) are filtered out in the query
+ * itself, not left for callers to remember to check — an expired flag
+ * should behave exactly like no flag at all everywhere it's used.
  */
 export async function getManualFlags(userIds: string[]): Promise<ManualFlag[]> {
   if (userIds.length === 0) return [];
   const supabase = await createClient();
   const { data } = await supabase
     .from("manual_flags")
-    .select("user_id, flagged_by, reason, created_at")
-    .in("user_id", userIds);
+    .select("user_id, flagged_by, reason, created_at, expires_at")
+    .in("user_id", userIds)
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
 
   return (data ?? []).map((row) => ({
     userId: row.user_id as string,
     flaggedBy: row.flagged_by as string,
     reason: row.reason as string | null,
     createdAt: row.created_at as string,
+    expiresAt: row.expires_at as string | null,
   }));
 }
