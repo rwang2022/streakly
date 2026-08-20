@@ -252,6 +252,98 @@ function BigCrown() {
   );
 }
 
+// A floating red royal cloak/mantle draped behind the champion — rendered
+// as the *first* child of the avatar wrapper (so it paints behind the
+// avatar circle) with an ermine collar and gold clasp at the top, wing
+// tips trailing below.
+//
+// Sizing verified against a scaled mockup of the real 88px avatar and its
+// two vertical clearances: ~40px above the avatar before the CHAMPION
+// ribbon (-top-3 on a champion row's own 28px/py-7 top padding), and
+// ~36px below before the next row's card (28px bottom padding + the
+// space-y-2 8px gap) — the cloak's top/bottom overflow (22px/30px) stays
+// inside both. Its left/right overflow (~31px) is deliberately close to
+// the laurel wreath's own already-accepted 26px overflow into the rank
+// icon's slot — same "thin edge, not a solid block" trade-off, just a
+// few px more.
+function Cloak() {
+  return (
+    <svg
+      viewBox="-20 0 260 250"
+      preserveAspectRatio="none"
+      aria-hidden
+      className="pointer-events-none absolute select-none"
+      style={{
+        width: 150,
+        height: 140,
+        left: -31,
+        top: -22,
+        transform: "rotate(-5deg)",
+      }}
+    >
+      <defs>
+        <linearGradient id="cloakBody" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#e0342a" />
+          <stop offset="55%" stopColor="#c41e1e" />
+          <stop offset="100%" stopColor="#8f1414" />
+        </linearGradient>
+        <linearGradient id="cloakFoldL" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#000000" stopOpacity="0" />
+          <stop offset="100%" stopColor="#4a0a0a" stopOpacity="0.55" />
+        </linearGradient>
+      </defs>
+      {/* left wing */}
+      <path
+        d="M 106 18 C 66 24, 24 46, 6 96 C -10 142, -14 190, 0 236
+           C 20 214, 34 204, 48 210 C 52 180, 46 148, 60 112
+           C 72 80, 90 46, 106 18 Z"
+        fill="url(#cloakBody)"
+        stroke="#f5b942"
+        strokeWidth="4"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M 106 18 C 82 58, 68 96, 58 130 C 50 158, 50 184, 48 210
+           C 58 204, 66 202, 74 208 C 78 166, 88 118, 106 18 Z"
+        fill="url(#cloakFoldL)"
+      />
+      {/* right wing (mirror) */}
+      <path
+        d="M 114 18 C 154 24, 196 46, 214 96 C 230 142, 234 190, 220 236
+           C 200 214, 186 204, 172 210 C 168 180, 174 148, 160 112
+           C 148 80, 130 46, 114 18 Z"
+        fill="url(#cloakBody)"
+        stroke="#f5b942"
+        strokeWidth="4"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M 114 18 C 138 58, 152 96, 162 130 C 170 158, 170 184, 172 210
+           C 162 204, 154 202, 146 208 C 142 166, 132 118, 114 18 Z"
+        fill="#000000"
+        opacity="0.18"
+      />
+      {/* gold hem tips */}
+      <circle cx="2" cy="234" r="7" fill="#f5b942" />
+      <circle cx="48" cy="211" r="6" fill="#f5b942" />
+      <circle cx="172" cy="211" r="6" fill="#f5b942" />
+      <circle cx="218" cy="234" r="7" fill="#f5b942" />
+      {/* ermine collar */}
+      <path
+        d="M 66 30 C 84 14, 136 14, 154 30 C 140 40, 126 30, 110 30 C 94 30, 80 40, 66 30 Z"
+        fill="#faf7ef"
+        stroke="#e4ddc8"
+        strokeWidth="1.5"
+      />
+      <ellipse cx="84" cy="26" rx="3" ry="4" fill="#2b2b2b" />
+      <ellipse cx="110" cy="22" rx="3" ry="4" fill="#2b2b2b" />
+      <ellipse cx="136" cy="26" rx="3" ry="4" fill="#2b2b2b" />
+      {/* gold clasp */}
+      <circle cx="110" cy="26" r="7" fill="#ffd60a" stroke="#c9860a" strokeWidth="2" />
+    </svg>
+  );
+}
+
 function ChampionStars() {
   return (
     <div className="mt-1.5 flex items-center gap-1">
@@ -632,6 +724,8 @@ function Row({
           the avatar by ~26px on each side, which would otherwise sit on
           top of the small rank-slot crown icon just to the left. */}
       <div className={`relative shrink-0 ${isChampion ? "ml-4" : ""}`}>
+        {/* cloak renders first so it paints behind the avatar circle */}
+        {isChampion && <Cloak />}
         <div
           className={`flex items-center justify-center rounded-full font-semibold ${
             isChampion
