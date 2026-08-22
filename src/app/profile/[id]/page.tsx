@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Flag, Flame, Handshake, Dumbbell, Mountain, PersonStanding, Zap, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser, getRequestTimeZone } from "@/lib/auth";
-import { computeScore } from "@/lib/scoring";
+import { computeScore, countsTowardStreak } from "@/lib/scoring";
 import { detectSuspiciousPattern } from "@/lib/fraud";
 import { getAdminUserIds, isVouchFresh } from "@/lib/vouches";
 import { getManualFlags, combineSuspicion } from "@/lib/moderation";
@@ -160,8 +160,14 @@ export default async function ProfilePage({
   // once nothing is currently holding a penalty (isVouched — see above).
   const displayScore =
     isSuspicious && !isVouched ? scoreResult.score - 100 : scoreResult.score;
+  // Same rule computeScore() applies internally: a sub-5-minute log still
+  // shows up in the activity list below, it just doesn't light up its day
+  // here — otherwise the calendar would show a day as "active" that the
+  // streak calculation silently skipped.
   const activeDates = new Set(
-    activities.map((a) => formatDateKey(new Date(a.logged_at), timeZone))
+    activities
+      .filter((a) => countsTowardStreak(a.duration_minutes))
+      .map((a) => formatDateKey(new Date(a.logged_at), timeZone))
   );
 
   const todayKey = formatDateKey(new Date(), timeZone);

@@ -274,6 +274,20 @@ insert through, so it now has an `is_admin_user()` escape hatch too —
 CHECK constraints can't hold a bare subquery the way RLS policies can,
 hence the wrapper function instead of an inline `exists (...)`.
 
+## Short logs don't count toward the streak
+
+No migration needed — this is pure application logic in
+`lib/scoring.ts`'s `countsTowardStreak()`. Any activity explicitly
+logged at 5 minutes or under (creatine, chia seeds, a vitamin — quick
+things worth having a record of, but not a workout) is still saved and
+still shows up in the activity list/history, it just doesn't light up
+its day on the heatmap or count toward streak, consistency, or volume.
+Leaving duration blank is unaffected — that still gets the default
+20-minute credit it always has. `history/page.tsx` and
+`profile/[id]/page.tsx` build their calendar heatmaps with the same
+filter so a day never shows "active" there while the real streak
+calculation silently skipped it.
+
 ## Suspicious activity detection
 
 `lib/fraud.ts` flags two patterns that look like gamed data rather than

@@ -4,6 +4,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { DeleteActivityButton } from "@/components/DeleteActivityButton";
 import type { Activity } from "@/lib/types";
 import { daysAgoIso, formatDateKey, formatDisplayDate } from "@/lib/date";
+import { countsTowardStreak } from "@/lib/scoring";
 import { Dumbbell, Mountain, PersonStanding, Zap, Sparkles } from "lucide-react";
 
 const WEEKS = 12;
@@ -38,8 +39,14 @@ export default async function HistoryPage() {
     .order("logged_at", { ascending: false });
 
   const activities = (data ?? []) as Activity[];
+  // Same rule computeScore() applies: a quick sub-5-minute log (creatine,
+  // chia seeds, etc.) still shows up in the list below, it just doesn't
+  // light up its day here — otherwise the calendar would show a day as
+  // "active" that the actual streak calculation silently skipped.
   const activeDates = new Set(
-    activities.map((a) => formatDateKey(new Date(a.logged_at), timeZone))
+    activities
+      .filter((a) => countsTowardStreak(a.duration_minutes))
+      .map((a) => formatDateKey(new Date(a.logged_at), timeZone))
   );
 
   // "Today" as a calendar date in the person's own timezone, then pinned to

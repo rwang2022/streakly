@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeScore } from "./scoring";
+import { computeScore, countsTowardStreak } from "./scoring";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = new Date("2026-08-15T12:00:00Z");
@@ -142,5 +142,61 @@ describe("computeScore", () => {
     const result = computeScore(activities, NOW, TZ);
     expect(result.activeDaysLast30).toBe(30);
     expect(result.currentStreak).toBe(35);
+  });
+
+  it("does not let a 5-minutes-or-under log count toward the streak", () => {
+    // e.g. logging creatine or chia seeds — still fine to save, just
+    // shouldn't move the needle.
+    const result = computeScore([activityDaysAgo(0, 5)], NOW, TZ);
+    expect(result.currentStreak).toBe(0);
+    expect(result.activeDaysLast30).toBe(0);
+    expect(result.totalMinutesLast30).toBe(0);
+    expect(result.isSlacking).toBe(true);
+  });
+
+  it("does count a log at 6 minutes toward the streak", () => {
+    const result = computeScore([activityDaysAgo(0, 6)], NOW, TZ);
+    expect(result.currentStreak).toBe(1);
+    expect(result.activeDaysLast30).toBe(1);
+  });
+
+  it("a short log doesn't rescue a day that's otherwise a gap", () => {
+    // Active today and 2 days ago, with only a 5-minute log in between —
+    // that shouldn't be enough to bridge the gap the way a real activity
+    // (or a streak freeze) would.
+    const activities = [
+      activityDaysAgo(0),
+      activityDaysAgo(1, 5),
+      activityDaysAgo(2),
+    ];
+    const result = computeScore(activities, NOW, TZ);
+    // Day 1 doesn't count as active, so it consumes the weekly streak
+    // freeze instead of contributing a real day — same as an actual gap,
+    // per the "streak freeze covers a single missed day" case above.
+    expect(result.currentStreak).toBe(2);
+    expect(result.usedStreakFreeze).toBe(true);
+  });
+
+  it("still credits an unset duration at the default, unaffected by the 5-minute rule", () => {
+    const result = computeScore([activityDaysAgo(0, null)], NOW, TZ);
+    expect(result.currentStreak).toBe(1);
+    expect(result.totalMinutesLast30).toBeGreaterThan(5);
+  });
+});
+
+describe("countsTowardStreak", () => {
+  it("excludes anything 5 minutes or under", () => {
+    expect(countsTowardStreak(5)).toBe(false);
+    expect(countsTowardStreak(1)).toBe(false);
+    expect(countsTowardStreak(0)).toBe(false);
+  });
+
+  it("includes anything over 5 minutes", () => {
+    expect(countsTowardStreak(6)).toBe(true);
+    expect(countsTowardStreak(60)).toBe(true);
+  });
+
+  it("includes an unset (null) duration", () => {
+    expect(countsTowardStreak(null)).toBe(true);
   });
 });

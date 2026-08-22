@@ -8,6 +8,14 @@ const STREAK_CAP_DAYS = 30;
 const VOLUME_CAP_MINUTES = 600; // ~20 min/day average over 30 days
 const SLACKING_THRESHOLD_DAYS = 3;
 const DEFAULT_DURATION_MINUTES = 20; // credited when a log has no duration set
+// Anything explicitly logged at 5 minutes or under doesn't move the needle —
+// a "creatine" or "chia seeds" entry is worth keeping as a record (it still
+// saves fine and still shows up in history), it just shouldn't be able to
+// extend a streak or count toward consistency/volume the way a real workout
+// does. Leaving duration blank is unaffected — that still gets
+// DEFAULT_DURATION_MINUTES credit, same as before; this only targets
+// activities *explicitly* logged short.
+const MIN_COUNTED_DURATION_MINUTES = 5;
 // A single missed day doesn't have to end a long streak — one grace day is
 // allowed per rolling week, same idea as Duolingo-style streak freezes.
 // The missed day itself still doesn't count toward the streak *number*
@@ -36,6 +44,17 @@ function daysAgoKey(days: number, from: Date, timeZone: string): string {
   return formatDateKey(new Date(from.getTime() - days * DAY_MS), timeZone);
 }
 
+// Shared with the heatmap builders (history + profile pages) so a day only
+// lights up green there if it would also actually count toward the streak
+// computed here — otherwise a "just took creatine" day would show active on
+// the calendar while silently not extending the streak, which reads as a
+// bug rather than the intended behavior.
+export function countsTowardStreak(durationMinutes: number | null): boolean {
+  return (
+    durationMinutes === null || durationMinutes > MIN_COUNTED_DURATION_MINUTES
+  );
+}
+
 /**
  * Computes the consistency-weighted score for a user from their raw activity
  * log rows. Pass in activities from at least the last ~35 days for an
@@ -52,12 +71,20 @@ export function computeScore(
   now: Date = new Date(),
   timeZone: string = DEFAULT_TIMEZONE
 ): ScoreResult {
+  // A quick supplement/vitamin-type log (5 min or under) is still worth
+  // saving as a record — it just doesn't get to extend a streak or count
+  // toward consistency/volume the way a real workout does. Filtered out
+  // right here, once, so every calculation below (activeDates, streak,
+  // longest streak, minutes) is automatically consistent about it.
+  const countedActivities = activities.filter((a) =>
+    countsTowardStreak(a.duration_minutes)
+  );
   const dateKey = (iso: string) => formatDateKey(new Date(iso), timeZone);
-  const activeDates = new Set(activities.map((a) => dateKey(a.logged_at)));
+  const activeDates = new Set(countedActivities.map((a) => dateKey(a.logged_at)));
 
   // --- consistency + volume (last 30 days) ---
   const minutesByDate = new Map<string, number>();
-  for (const a of activities) {
+  for (const a of countedActivities) {
     const key = dateKey(a.logged_at);
     minutesByDate.set(
       key,
