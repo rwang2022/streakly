@@ -259,6 +259,21 @@ independent additions:
    penalty's sledgehammer — useful when only one or two logged entries
    are actually fake and the rest of someone's history is legit.
 
+## Migration 14: admin retroactive activity entry
+
+Run `supabase/migration_14_admin_retroactive_activity.sql`. Lets an
+admin (`is_admin = true`) log an activity for *any* user, backdated past
+the normal 24-hour window everyone else is limited to — useful for
+backfilling something someone forgot to log. Shows up as "Add activity
+for them (admin)" on a profile page, right below the mod-flag button.
+
+Two things had to change together for this to actually work, not just
+the RLS policy: the `activities_logged_at_reasonable` CHECK constraint
+(Migration 5) applies no matter who's inserting or what RLS let the
+insert through, so it now has an `is_admin_user()` escape hatch too —
+CHECK constraints can't hold a bare subquery the way RLS policies can,
+hence the wrapper function instead of an inline `exists (...)`.
+
 ## Suspicious activity detection
 
 `lib/fraud.ts` flags two patterns that look like gamed data rather than

@@ -10,6 +10,7 @@ import { getBadge } from "@/lib/badges";
 import { BottomNav } from "@/components/BottomNav";
 import { VouchButton } from "@/components/VouchButton";
 import { ModFlagButton } from "@/components/ModFlagButton";
+import { AdminAddActivityButton } from "@/components/AdminAddActivityButton";
 import { DeleteActivityButton } from "@/components/DeleteActivityButton";
 import type { Activity } from "@/lib/types";
 import { daysAgoIso, formatDateKey, formatDisplayDate } from "@/lib/date";
@@ -309,6 +310,10 @@ export default async function ProfilePage({
                 initialReason={manualFlag?.reason ?? null}
                 initialExpiresAt={manualFlag?.expiresAt ?? null}
               />
+            )}
+
+            {hasAccess && !isSelf && viewerIsAdmin && (
+              <AdminAddActivityButton targetUserId={id} />
             )}
 
             <p className="mt-8 text-sm font-medium text-muted">

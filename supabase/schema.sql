@@ -469,3 +469,34 @@ create policy "admins can delete any activity"
   using (
     exists (select 1 from public.profiles where id = auth.uid() and is_admin)
   );
+
+-- Migration 14: let an admin add an activity for any user, backdated past
+-- the normal 24h window. See
+-- migration_14_admin_retroactive_activity.sql for the full rationale —
+-- the short version: RLS gets an additive admin-insert policy, and the
+-- logged_at CHECK constraint gets an is_admin_user() escape hatch since
+-- constraints can't hold a bare subquery the way RLS policies can.
+
+create or replace function public.is_admin_user(uid uuid)
+returns boolean
+language sql
+stable
+security definer set search_path = public
+as $$
+  select coalesce((select is_admin from public.profiles where id = uid), false);
+$$;
+
+alter table public.activities drop constraint if exists activities_logged_at_reasonable;
+alter table public.activities
+  add constraint activities_logged_at_reasonable
+  check (
+    (logged_at <= now() + interval '5 minutes' and logged_at >= now() - interval '24 hours')
+    or public.is_admin_user(auth.uid())
+  ) not valid;
+
+create policy "admins can add activities for any user"
+  on public.activities for insert
+  to authenticated
+  with check (
+    exists (select 1 from public.profiles where id = auth.uid() and is_admin)
+  );
