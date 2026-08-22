@@ -283,7 +283,7 @@ function Cloak() {
       viewBox="0 0 200 230"
       preserveAspectRatio="none"
       aria-hidden
-      className="pointer-events-none absolute select-none"
+      className="pointer-events-none absolute select-none -z-10"
       style={{
         width: 148,
         height: 132,
@@ -712,8 +712,17 @@ function Row({
       {/* Extra left margin on champion only: the wreath still overflows
           the avatar by ~26px on each side, which would otherwise sit on
           top of the small rank-slot crown icon just to the left. */}
-      <div className={`relative shrink-0 ${isChampion ? "ml-4" : ""}`}>
-        {/* cloak renders first so it paints behind the avatar circle */}
+      {/* `isolate` gives this wrapper its own stacking context — without
+          it, the cloak (position: absolute) paints *above* the avatar
+          circle (position: static) regardless of DOM order, since
+          positioned elements always paint after non-positioned in-flow
+          content in the same context. The old cloak shape had a gap down
+          the middle so this went unnoticed; the current solid silhouette
+          fully hid the avatar until this was added. */}
+      <div className={`relative isolate shrink-0 ${isChampion ? "ml-4" : ""}`}>
+        {/* cloak renders first *and* sits at a negative z-index, so it
+            paints behind the avatar circle within the isolated context
+            above, not just earlier in the DOM. */}
         {isChampion && <Cloak />}
         <div
           className={`flex items-center justify-center rounded-full font-semibold ${
