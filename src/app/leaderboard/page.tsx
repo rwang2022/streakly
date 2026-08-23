@@ -257,40 +257,29 @@ function BigCrown() {
   );
 }
 
-// A floating red royal cloak/mantle draped behind the champion — rendered
-// as the *first* child of the avatar wrapper (so it paints behind the
-// avatar circle) with an ermine collar and gold clasp at the top.
+// A small red cape peeking out from behind the *bottom* of the champion's
+// avatar — most of its own shape sits behind the avatar's top half where
+// it's simply never seen (the avatar paints in front, see the isolate/-z
+// setup on its wrapper below), so what's actually visible is just the two
+// short rounded tails trailing beneath, like a cape draped over shoulders
+// hidden behind the avatar. `.cloak-float` (globals.css) gives it a slow
+// vertical bob + a couple degrees of sway — "floating in calm air" rather
+// than a static sticker.
 //
-// This is a single unified silhouette (not two separate pointed wings —
-// an earlier version read as bat wings rather than a cape someone's
-// actually wearing). It stays narrow right where the collar sits, so it
-// visually rests on the avatar's "shoulders" instead of ballooning out
-// immediately, then flows into two soft rounded lobes with a shallow
-// scoop between them — like fabric drifting in calm air rather than
-// hanging straight down under gravity.
-//
-// Sizing verified against a scaled mockup of the real 88px avatar and its
-// two vertical clearances: ~40px above the avatar before the CHAMPION
-// ribbon, and ~36px below before the next row's card (py-7 bottom
-// padding + the space-y-2 gap) — the cloak's top/bottom overflow
-// (18px/44px) stays inside both. Its left/right overflow (~30px) is
-// deliberately close to the laurel wreath's own already-accepted 26px
-// overflow into the rank icon's slot — same "thin edge, not a solid
-// block" trade-off, just a few px more.
+// Sizing verified against a scaled mockup of the real 88px avatar: the
+// visible part is entirely below the avatar's own vertical center, so it
+// never comes near the ~40px-above clearance the CHAMPION ribbon needs,
+// and its ~16px peek past the avatar's bottom edge is well inside the
+// ~36px budget before the next row's card. Left/right overflow (~4px) is
+// intentionally subtle now that it's not trying to wrap the whole avatar.
 function Cloak() {
   return (
     <svg
-      viewBox="0 0 200 230"
+      viewBox="0 0 140 90"
       preserveAspectRatio="none"
       aria-hidden
-      className="pointer-events-none absolute select-none -z-10"
-      style={{
-        width: 148,
-        height: 132,
-        left: -30,
-        top: -18,
-        transform: "rotate(-4deg)",
-      }}
+      className="cloak-float pointer-events-none absolute select-none -z-10"
+      style={{ width: 80, height: 64, left: 4, top: 40 }}
     >
       <defs>
         <linearGradient id="cloakBody" x1="0" y1="0" x2="0" y2="1">
@@ -300,35 +289,22 @@ function Cloak() {
         </linearGradient>
       </defs>
       <path
-        d="M 90 18 C 60 22, 28 42, 15 82 C 4 115, 0 148, 10 178
-           C 16 198, 30 212, 48 210 C 62 208, 66 194, 74 182
-           C 82 192, 90 190, 100 172 C 110 190, 118 192, 126 182
-           C 134 194, 138 208, 152 210 C 170 212, 184 198, 190 178
-           C 200 148, 196 115, 185 82 C 172 42, 140 22, 110 18 Z"
+        d="M 30 8 C 12 12, 2 30, 5 55 C 8 75, 20 85, 35 82
+           C 45 80, 48 68, 55 62 C 62 72, 68 70, 70 58
+           C 72 70, 78 72, 85 62 C 92 68, 95 80, 105 82
+           C 120 85, 132 75, 135 55 C 138 30, 128 12, 110 8
+           C 95 4, 85 6, 70 6 C 55 6, 45 4, 30 8 Z"
         fill="url(#cloakBody)"
         stroke="#f5b942"
-        strokeWidth="4"
+        strokeWidth="3.5"
         strokeLinejoin="round"
       />
       {/* soft center fold so it doesn't read as flat */}
       <path
-        d="M 100 18 C 96 60 96 140 100 210 C 104 140 104 60 100 18 Z"
+        d="M 70 8 C 66 40 66 75 70 82 C 74 75 74 40 70 8 Z"
         fill="#000000"
         opacity="0.15"
       />
-      {/* ermine collar */}
-      <path
-        d="M 66 26 C 84 10, 116 10, 134 26 C 120 36, 110 26, 100 26
-           C 90 26, 80 36, 66 26 Z"
-        fill="#faf7ef"
-        stroke="#e4ddc8"
-        strokeWidth="1.5"
-      />
-      <ellipse cx="80" cy="22" rx="3" ry="4" fill="#2b2b2b" />
-      <ellipse cx="100" cy="18" rx="3" ry="4" fill="#2b2b2b" />
-      <ellipse cx="120" cy="22" rx="3" ry="4" fill="#2b2b2b" />
-      {/* gold clasp */}
-      <circle cx="100" cy="22" r="7" fill="#ffd60a" stroke="#c9860a" strokeWidth="2" />
     </svg>
   );
 }

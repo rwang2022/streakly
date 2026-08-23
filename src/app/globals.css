@@ -96,6 +96,33 @@ body {
   }
 }
 
+/* The champion's cape drifts gently — a small vertical bob plus a couple
+   degrees of sway, like fabric caught in calm moving air rather than a
+   static sticker pinned behind the avatar. Amplitude is deliberately
+   small (a few px / a few degrees) since it's a small decorative element
+   peeking out from behind an avatar, not the main event. */
+@keyframes cloak-float {
+  0%,
+  100% {
+    transform: rotate(-3deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-1deg) translateY(5px);
+  }
+}
+
+.cloak-float {
+  transform-origin: 50% 0%;
+  animation: cloak-float 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cloak-float {
+    animation: none;
+    transform: rotate(-3deg);
+  }
+}
+
 /* #1 on the leaderboard gets a slow, breathing gold glow instead of just
    another flat card — a subtle "this one's different" cue rather than
    anything gaudy. Amplitude is deliberately small (box-shadow spread only
