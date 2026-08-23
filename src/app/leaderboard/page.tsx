@@ -258,23 +258,21 @@ function BigCrown() {
 }
 
 // A proper royal cape the champion is visibly wearing — an ermine collar
-// with a gold clasp pops up beside the avatar's shoulders, and the cape
-// itself flows down both sides and well below in a wide, wavy hem.
-// `.cloak-float` (globals.css) gives it a slow billowing drift (rotate +
-// vertical bob + a slight shear), like fabric caught in calm moving air.
+// with a gold clasp sits right at the neckline, and the cape hugs close
+// around the avatar/wreath silhouette rather than ballooning out past it,
+// which is what actually reads as "worn" instead of "a shape floating
+// behind." `.cloak-float` (globals.css) gives it a slow billowing drift
+// (rotate + vertical bob + a slight shear), like fabric caught in calm
+// moving air.
 //
-// Sized and positioned against a scaled mockup of the real 88px avatar:
-// top overflow (24px) stays under the ~40px clearance the CHAMPION
-// ribbon needs above; bottom overflow (64px) is why the champion row
-// itself now gets extra bottom padding (pt-7 pb-16 instead of a
-// symmetric py-7) rather than trying to cram this into the old ~36px
-// budget — a cape this size needs real room to flow into, not a squeeze.
-// Left/right overflow (~46px) is bigger than the laurel wreath's own
-// ~26px, which is why the avatar-wrapper and name-column margins both
-// went from ml-4 to ml-6 to compensate — some overlap into the rank
-// icon's slot is still expected at the very edge, same trade-off as the
-// wreath already makes, just carried a bit further for a cape big enough
-// to actually read as "worn," not just decorative trim.
+// Sized and positioned against a scaled mockup of the real 88px avatar,
+// tightened after an earlier pass ballooned too far past the wreath's own
+// ~26px overflow: top overflow (14px) stays well under the ~40px
+// clearance the CHAMPION ribbon needs above, and bottom overflow (23px)
+// is comfortably inside the champion row's pb-10 bottom padding + the
+// space-y-2 gap. Left/right overflow (~31px) is close to the wreath's
+// own ~26px — same "thin edge, not a solid block" trade-off already
+// accepted there.
 function Cloak() {
   return (
     <svg
@@ -282,7 +280,7 @@ function Cloak() {
       preserveAspectRatio="none"
       aria-hidden
       className="cloak-float pointer-events-none absolute select-none -z-10"
-      style={{ width: 180, height: 176, left: -46, top: -24 }}
+      style={{ width: 150, height: 125, left: -31, top: -14 }}
     >
       <defs>
         <linearGradient id="cloakBody" x1="0.15" y1="0" x2="0.85" y2="1">
@@ -565,10 +563,10 @@ function Row({
     <div
       style={cardStyle}
       className={`relative flex items-center gap-3 rounded-2xl border px-4 transition active:scale-[0.99] ${
-        // Extra bottom padding (vs. a symmetric py-7) specifically to give
-        // the bigger cloak below the avatar somewhere real to flow into,
-        // instead of cramming its hem right up against the next row.
-        isChampion ? "champion-row pt-7 pb-16" : "py-4"
+        // Slightly extra bottom padding (vs. a symmetric py-7) so the
+        // cloak's hem has a little real room below it instead of landing
+        // right on the next row's edge.
+        isChampion ? "champion-row pt-7 pb-10" : "py-4"
       } ${
         isBusted
           ? "border-2 border-accent bg-accent/10"
@@ -731,12 +729,9 @@ function Row({
         )}
       </div>
 
-      {/* Extra left margin on champion only: both the wreath (~26px) and
-          the bigger cloak (~46px) overflow the avatar, which would
-          otherwise sit on top of the small rank-slot crown icon just to
-          the left. ml-6 doesn't fully clear the cloak's overflow — same
-          "thin edge, not a solid block" trade-off already accepted for
-          the wreath, just carried a bit further. */}
+      {/* Extra left margin on champion only: both the wreath and cloak
+          overflow the avatar by ~26-31px, which would otherwise sit on
+          top of the small rank-slot crown icon just to the left. */}
       {/* `isolate` gives this wrapper its own stacking context — without
           it, the cloak (position: absolute) paints *above* the avatar
           circle (position: static) regardless of DOM order, since
@@ -744,7 +739,7 @@ function Row({
           content in the same context. The old cloak shape had a gap down
           the middle so this went unnoticed; the current solid silhouette
           fully hid the avatar until this was added. */}
-      <div className={`relative isolate shrink-0 ${isChampion ? "ml-6" : ""}`}>
+      <div className={`relative isolate shrink-0 ${isChampion ? "ml-4" : ""}`}>
         {/* cloak renders first *and* sits at a negative z-index, so it
             paints behind the avatar circle within the isolated context
             above, not just earlier in the DOM. */}
@@ -829,7 +824,7 @@ function Row({
           right side too (absolutely positioned, so flex layout doesn't
           account for it) — extra left margin here on champion only so
           they don't sit on top of the name/streak text. */}
-      <div className={`min-w-0 flex-1 ${isChampion ? "ml-6" : ""}`}>
+      <div className={`min-w-0 flex-1 ${isChampion ? "ml-4" : ""}`}>
         <div className="flex items-center gap-1.5">
           <p
             className={`truncate font-medium ${
