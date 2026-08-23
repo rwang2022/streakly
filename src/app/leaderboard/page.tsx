@@ -257,30 +257,31 @@ function BigCrown() {
   );
 }
 
-// A proper royal cape the champion is visibly wearing — an ermine collar
-// with a gold clasp sits right at the neckline, and the cape hugs close
-// around the avatar/wreath silhouette rather than ballooning out past it,
-// which is what actually reads as "worn" instead of "a shape floating
-// behind." `.cloak-float` (globals.css) gives it a slow billowing drift
-// (rotate + vertical bob + a slight shear), like fabric caught in calm
-// moving air.
+// A proper royal cape the champion is visibly wearing — draped from the
+// shoulders, not the head. The avatar circle *is* the head here, so the
+// cape's attachment point (the gold clasp) sits at the avatar's own
+// bottom edge, where a neck would be, entirely tucked behind it — nothing
+// above the avatar's vertical center at all. What's actually visible is
+// the cape flowing out and down from behind that point, which is what
+// makes it read as worn rather than a collar wrapped around the head.
+// `.cloak-float` (globals.css) gives it a slow billowing drift (rotate +
+// vertical bob + a slight shear), like fabric caught in calm moving air.
 //
-// Sized and positioned against a scaled mockup of the real 88px avatar,
-// tightened after an earlier pass ballooned too far past the wreath's own
-// ~26px overflow: top overflow (14px) stays well under the ~40px
-// clearance the CHAMPION ribbon needs above, and bottom overflow (23px)
-// is comfortably inside the champion row's pb-10 bottom padding + the
-// space-y-2 gap. Left/right overflow (~31px) is close to the wreath's
-// own ~26px — same "thin edge, not a solid block" trade-off already
-// accepted there.
+// Sized and positioned against a scaled mockup of the real 88px avatar:
+// zero top overflow (it never extends above the avatar, so the ~40px
+// CHAMPION-ribbon clearance is a non-issue), and ~52px bottom overflow,
+// comfortably inside the champion row's pb-12 bottom padding + the
+// space-y-2 gap. Left/right overflow (26px) lines up with the laurel
+// wreath's own overflow exactly, so the existing ml-4 compensation
+// already covers it.
 function Cloak() {
   return (
     <svg
-      viewBox="0 0 220 260"
+      viewBox="0 0 180 130"
       preserveAspectRatio="none"
       aria-hidden
       className="cloak-float pointer-events-none absolute select-none -z-10"
-      style={{ width: 150, height: 125, left: -31, top: -14 }}
+      style={{ width: 140, height: 100, left: -26, top: 40 }}
     >
       <defs>
         <linearGradient id="cloakBody" x1="0.15" y1="0" x2="0.85" y2="1">
@@ -290,62 +291,49 @@ function Cloak() {
         </linearGradient>
       </defs>
       <path
-        d="M 100 30 C 65 34, 25 60, 12 108 C 2 148, -4 188, 8 222
-           C 18 245, 35 258, 55 254 C 70 251, 75 232, 85 218
-           C 95 230, 102 226, 110 205 C 118 226, 125 230, 135 218
-           C 145 232, 150 251, 165 254 C 185 258, 202 245, 212 222
-           C 224 188, 218 148, 208 108 C 195 60, 155 34, 120 30 Z"
+        d="M 90 10 C 55 14, 20 35, 10 70 C 4 95, 12 115, 30 118
+           C 45 120, 50 105, 60 92 C 70 105, 80 100, 90 82
+           C 100 100, 110 105, 120 92 C 130 105, 135 120, 150 118
+           C 168 115, 176 95, 170 70 C 160 35, 125 14, 90 10 Z"
         fill="url(#cloakBody)"
         stroke="#f5b942"
-        strokeWidth="4.5"
+        strokeWidth="4"
         strokeLinejoin="round"
       />
       {/* fold lines for a bit of fabric texture instead of a flat fill */}
       <path
-        d="M 100 30 C 90 90 88 170 95 240"
-        fill="none"
-        stroke="#000"
-        strokeWidth="3"
-        opacity="0.18"
-        strokeLinecap="round"
+        d="M 90 10 C 82 45 80 90 90 118 C 100 90 98 45 90 10 Z"
+        fill="#000000"
+        opacity="0.15"
       />
       <path
-        d="M 120 30 C 128 90 130 170 122 240"
-        fill="none"
-        stroke="#000"
-        strokeWidth="3"
-        opacity="0.18"
-        strokeLinecap="round"
-      />
-      <path
-        d="M 55 90 C 45 140 45 190 58 232"
+        d="M 40 40 C 30 70 28 100 38 115"
         fill="none"
         stroke="#000"
         strokeWidth="2.5"
-        opacity="0.12"
+        opacity="0.14"
         strokeLinecap="round"
       />
       <path
-        d="M 165 90 C 175 140 175 190 160 232"
+        d="M 140 40 C 150 70 152 100 142 115"
         fill="none"
         stroke="#000"
         strokeWidth="2.5"
-        opacity="0.12"
+        opacity="0.14"
         strokeLinecap="round"
       />
-      {/* ermine collar, popped up visibly beside the avatar's shoulders */}
+      {/* small ermine tuft + gold clasp at the attachment point — tucked
+          behind the avatar's bottom edge, only relevant if the avatar
+          were ever transparent, but kept for when the cape peeks past
+          the sides right at the top of its own shape */}
       <path
-        d="M 78 40 C 92 20, 128 20, 142 40 C 128 50, 118 40, 110 40
-           C 102 40, 90 50, 78 40 Z"
+        d="M 74 14 C 82 4, 98 4, 106 14 C 96 20, 90 14, 90 14
+           C 90 14, 84 20, 74 14 Z"
         fill="#faf7ef"
         stroke="#e4ddc8"
-        strokeWidth="2"
+        strokeWidth="1.5"
       />
-      <ellipse cx="92" cy="34" rx="3.5" ry="4.5" fill="#2b2b2b" />
-      <ellipse cx="110" cy="30" rx="3.5" ry="4.5" fill="#2b2b2b" />
-      <ellipse cx="128" cy="34" rx="3.5" ry="4.5" fill="#2b2b2b" />
-      {/* gold clasp */}
-      <circle cx="110" cy="34" r="8.5" fill="#ffd60a" stroke="#c9860a" strokeWidth="2.5" />
+      <circle cx="90" cy="15" r="7.5" fill="#ffd60a" stroke="#c9860a" strokeWidth="2.2" />
     </svg>
   );
 }
@@ -566,7 +554,7 @@ function Row({
         // Slightly extra bottom padding (vs. a symmetric py-7) so the
         // cloak's hem has a little real room below it instead of landing
         // right on the next row's edge.
-        isChampion ? "champion-row pt-7 pb-10" : "py-4"
+        isChampion ? "champion-row pt-7 pb-12" : "py-4"
       } ${
         isBusted
           ? "border-2 border-accent bg-accent/10"
