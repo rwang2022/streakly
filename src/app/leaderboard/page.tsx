@@ -257,54 +257,97 @@ function BigCrown() {
   );
 }
 
-// A small red cape peeking out from behind the *bottom* of the champion's
-// avatar — most of its own shape sits behind the avatar's top half where
-// it's simply never seen (the avatar paints in front, see the isolate/-z
-// setup on its wrapper below), so what's actually visible is just the two
-// short rounded tails trailing beneath, like a cape draped over shoulders
-// hidden behind the avatar. `.cloak-float` (globals.css) gives it a slow
-// vertical bob + a couple degrees of sway — "floating in calm air" rather
-// than a static sticker.
+// A proper royal cape the champion is visibly wearing — an ermine collar
+// with a gold clasp pops up beside the avatar's shoulders, and the cape
+// itself flows down both sides and well below in a wide, wavy hem.
+// `.cloak-float` (globals.css) gives it a slow billowing drift (rotate +
+// vertical bob + a slight shear), like fabric caught in calm moving air.
 //
-// Sizing verified against a scaled mockup of the real 88px avatar: the
-// visible part is entirely below the avatar's own vertical center, so it
-// never comes near the ~40px-above clearance the CHAMPION ribbon needs,
-// and its ~16px peek past the avatar's bottom edge is well inside the
-// ~36px budget before the next row's card. Left/right overflow (~4px) is
-// intentionally subtle now that it's not trying to wrap the whole avatar.
+// Sized and positioned against a scaled mockup of the real 88px avatar:
+// top overflow (24px) stays under the ~40px clearance the CHAMPION
+// ribbon needs above; bottom overflow (64px) is why the champion row
+// itself now gets extra bottom padding (pt-7 pb-16 instead of a
+// symmetric py-7) rather than trying to cram this into the old ~36px
+// budget — a cape this size needs real room to flow into, not a squeeze.
+// Left/right overflow (~46px) is bigger than the laurel wreath's own
+// ~26px, which is why the avatar-wrapper and name-column margins both
+// went from ml-4 to ml-6 to compensate — some overlap into the rank
+// icon's slot is still expected at the very edge, same trade-off as the
+// wreath already makes, just carried a bit further for a cape big enough
+// to actually read as "worn," not just decorative trim.
 function Cloak() {
   return (
     <svg
-      viewBox="0 0 140 90"
+      viewBox="0 0 220 260"
       preserveAspectRatio="none"
       aria-hidden
       className="cloak-float pointer-events-none absolute select-none -z-10"
-      style={{ width: 80, height: 64, left: 4, top: 40 }}
+      style={{ width: 180, height: 176, left: -46, top: -24 }}
     >
       <defs>
-        <linearGradient id="cloakBody" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#e0342a" />
-          <stop offset="55%" stopColor="#c41e1e" />
-          <stop offset="100%" stopColor="#8f1414" />
+        <linearGradient id="cloakBody" x1="0.15" y1="0" x2="0.85" y2="1">
+          <stop offset="0%" stopColor="#f04a3a" />
+          <stop offset="45%" stopColor="#d92a26" />
+          <stop offset="100%" stopColor="#7e1414" />
         </linearGradient>
       </defs>
       <path
-        d="M 30 8 C 12 12, 2 30, 5 55 C 8 75, 20 85, 35 82
-           C 45 80, 48 68, 55 62 C 62 72, 68 70, 70 58
-           C 72 70, 78 72, 85 62 C 92 68, 95 80, 105 82
-           C 120 85, 132 75, 135 55 C 138 30, 128 12, 110 8
-           C 95 4, 85 6, 70 6 C 55 6, 45 4, 30 8 Z"
+        d="M 100 30 C 65 34, 25 60, 12 108 C 2 148, -4 188, 8 222
+           C 18 245, 35 258, 55 254 C 70 251, 75 232, 85 218
+           C 95 230, 102 226, 110 205 C 118 226, 125 230, 135 218
+           C 145 232, 150 251, 165 254 C 185 258, 202 245, 212 222
+           C 224 188, 218 148, 208 108 C 195 60, 155 34, 120 30 Z"
         fill="url(#cloakBody)"
         stroke="#f5b942"
-        strokeWidth="3.5"
+        strokeWidth="4.5"
         strokeLinejoin="round"
       />
-      {/* soft center fold so it doesn't read as flat */}
+      {/* fold lines for a bit of fabric texture instead of a flat fill */}
       <path
-        d="M 70 8 C 66 40 66 75 70 82 C 74 75 74 40 70 8 Z"
-        fill="#000000"
-        opacity="0.15"
+        d="M 100 30 C 90 90 88 170 95 240"
+        fill="none"
+        stroke="#000"
+        strokeWidth="3"
+        opacity="0.18"
+        strokeLinecap="round"
       />
+      <path
+        d="M 120 30 C 128 90 130 170 122 240"
+        fill="none"
+        stroke="#000"
+        strokeWidth="3"
+        opacity="0.18"
+        strokeLinecap="round"
+      />
+      <path
+        d="M 55 90 C 45 140 45 190 58 232"
+        fill="none"
+        stroke="#000"
+        strokeWidth="2.5"
+        opacity="0.12"
+        strokeLinecap="round"
+      />
+      <path
+        d="M 165 90 C 175 140 175 190 160 232"
+        fill="none"
+        stroke="#000"
+        strokeWidth="2.5"
+        opacity="0.12"
+        strokeLinecap="round"
+      />
+      {/* ermine collar, popped up visibly beside the avatar's shoulders */}
+      <path
+        d="M 78 40 C 92 20, 128 20, 142 40 C 128 50, 118 40, 110 40
+           C 102 40, 90 50, 78 40 Z"
+        fill="#faf7ef"
+        stroke="#e4ddc8"
+        strokeWidth="2"
+      />
+      <ellipse cx="92" cy="34" rx="3.5" ry="4.5" fill="#2b2b2b" />
+      <ellipse cx="110" cy="30" rx="3.5" ry="4.5" fill="#2b2b2b" />
+      <ellipse cx="128" cy="34" rx="3.5" ry="4.5" fill="#2b2b2b" />
+      {/* gold clasp */}
+      <circle cx="110" cy="34" r="8.5" fill="#ffd60a" stroke="#c9860a" strokeWidth="2.5" />
     </svg>
   );
 }
@@ -522,7 +565,10 @@ function Row({
     <div
       style={cardStyle}
       className={`relative flex items-center gap-3 rounded-2xl border px-4 transition active:scale-[0.99] ${
-        isChampion ? "champion-row py-7" : "py-4"
+        // Extra bottom padding (vs. a symmetric py-7) specifically to give
+        // the bigger cloak below the avatar somewhere real to flow into,
+        // instead of cramming its hem right up against the next row.
+        isChampion ? "champion-row pt-7 pb-16" : "py-4"
       } ${
         isBusted
           ? "border-2 border-accent bg-accent/10"
@@ -685,9 +731,12 @@ function Row({
         )}
       </div>
 
-      {/* Extra left margin on champion only: the wreath still overflows
-          the avatar by ~26px on each side, which would otherwise sit on
-          top of the small rank-slot crown icon just to the left. */}
+      {/* Extra left margin on champion only: both the wreath (~26px) and
+          the bigger cloak (~46px) overflow the avatar, which would
+          otherwise sit on top of the small rank-slot crown icon just to
+          the left. ml-6 doesn't fully clear the cloak's overflow — same
+          "thin edge, not a solid block" trade-off already accepted for
+          the wreath, just carried a bit further. */}
       {/* `isolate` gives this wrapper its own stacking context — without
           it, the cloak (position: absolute) paints *above* the avatar
           circle (position: static) regardless of DOM order, since
@@ -695,7 +744,7 @@ function Row({
           content in the same context. The old cloak shape had a gap down
           the middle so this went unnoticed; the current solid silhouette
           fully hid the avatar until this was added. */}
-      <div className={`relative isolate shrink-0 ${isChampion ? "ml-4" : ""}`}>
+      <div className={`relative isolate shrink-0 ${isChampion ? "ml-6" : ""}`}>
         {/* cloak renders first *and* sits at a negative z-index, so it
             paints behind the avatar circle within the isolated context
             above, not just earlier in the DOM. */}
@@ -776,11 +825,11 @@ function Row({
         )}
       </div>
 
-      {/* The wreath overflows the avatar wrapper by ~26px on each side
-          (it's absolutely positioned, so flex layout doesn't account for
-          it) — extra left margin here on champion only so its right-side
-          leaves don't sit on top of the name/streak text. */}
-      <div className={`min-w-0 flex-1 ${isChampion ? "ml-4" : ""}`}>
+      {/* The wreath and cloak both overflow the avatar wrapper on the
+          right side too (absolutely positioned, so flex layout doesn't
+          account for it) — extra left margin here on champion only so
+          they don't sit on top of the name/streak text. */}
+      <div className={`min-w-0 flex-1 ${isChampion ? "ml-6" : ""}`}>
         <div className="flex items-center gap-1.5">
           <p
             className={`truncate font-medium ${

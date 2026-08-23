@@ -96,24 +96,31 @@ body {
   }
 }
 
-/* The champion's cape drifts gently — a small vertical bob plus a couple
-   degrees of sway, like fabric caught in calm moving air rather than a
-   static sticker pinned behind the avatar. Amplitude is deliberately
-   small (a few px / a few degrees) since it's a small decorative element
-   peeking out from behind an avatar, not the main event. */
+/* The champion's cape billows — rotate, a vertical bob, and a slight
+   shear all drifting independently, like fabric actually caught in calm
+   moving air rather than a simple side-to-side sticker. Anchored at
+   transform-origin 50% ~15% (roughly where the collar/clasp sits) so it
+   reads as pinned at the shoulders and flowing from there, not rotating
+   around its own center. */
 @keyframes cloak-float {
   0%,
   100% {
-    transform: rotate(-3deg) translateY(0);
+    transform: rotate(-3deg) translateY(0) skewX(0deg);
+  }
+  25% {
+    transform: rotate(-5deg) translateY(-3px) skewX(-1deg);
   }
   50% {
-    transform: rotate(-1deg) translateY(5px);
+    transform: rotate(-2deg) translateY(4px) skewX(1deg);
+  }
+  75% {
+    transform: rotate(-4deg) translateY(-2px) skewX(-0.5deg);
   }
 }
 
 .cloak-float {
-  transform-origin: 50% 0%;
-  animation: cloak-float 3.2s ease-in-out infinite;
+  transform-origin: 50% 15%;
+  animation: cloak-float 4.5s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
