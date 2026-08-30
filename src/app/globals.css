@@ -160,3 +160,29 @@ body {
     box-shadow: 0 0 0 1px rgba(255, 191, 61, 0.6), 0 0 14px 0 rgba(255, 191, 61, 0.3);
   }
 }
+
+/* History heatmap: each day cell settles in with a quick rise, staggered
+   left-to-right across the strip via an inline animation-delay. Small
+   amplitude and a snappy easing so ~90 cells read as the grid assembling
+   itself, not a slow wave. `both` holds the start frame during the delay
+   and the end frame after, so nothing flashes at full opacity first. */
+@keyframes heat-cell-in {
+  from {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.heat-cell {
+  animation: heat-cell-in 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heat-cell {
+    animation: none;
+  }
+}
