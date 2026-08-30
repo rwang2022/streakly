@@ -12,15 +12,11 @@ import { VouchButton } from "@/components/VouchButton";
 import { ModFlagButton } from "@/components/ModFlagButton";
 import { AdminAddActivityButton } from "@/components/AdminAddActivityButton";
 import { DeleteActivityButton } from "@/components/DeleteActivityButton";
+import { ActivityHeatmap } from "@/components/ActivityHeatmap";
 import type { Activity } from "@/lib/types";
 import { daysAgoIso, formatDateKey, formatDisplayDate } from "@/lib/date";
 
-const WEEKS = 12;
-const DAY_MS = 86400000;
-// Grid rows run Sun→Sat; only labeling every other day (GitHub's
-// contribution-graph convention) keeps the label column legible at this
-// size instead of a blur of tiny single letters.
-const DAY_LABELS = ["", "M", "", "W", "", "F", ""];
+const MONTHS = 3;
 
 const ICONS: Record<string, React.ReactNode> = {
   gym: <Dumbbell size={16} />,
@@ -64,7 +60,7 @@ export default async function ProfilePage({
     );
   }
 
-  const since = daysAgoIso(WEEKS * 7);
+  const since = daysAgoIso(MONTHS * 31 + 14);
   const isSelf = user?.id === id;
 
   // Whether we're even allowed to see this person's activity is a real
@@ -169,28 +165,6 @@ export default async function ProfilePage({
       .filter((a) => countsTowardStreak(a.duration_minutes))
       .map((a) => formatDateKey(new Date(a.logged_at), timeZone))
   );
-
-  const todayKey = formatDateKey(new Date(), timeZone);
-  const today = new Date(`${todayKey}T00:00:00Z`);
-  const startOffset = today.getUTCDay();
-  const gridStart = new Date(
-    today.getTime() - (WEEKS * 7 - 1 + startOffset) * DAY_MS
-  );
-
-  const columns: { key: string; active: boolean; isFuture: boolean }[][] = [];
-  for (let w = 0; w < WEEKS + 1; w++) {
-    const col: { key: string; active: boolean; isFuture: boolean }[] = [];
-    for (let d = 0; d < 7; d++) {
-      const date = new Date(gridStart.getTime() + (w * 7 + d) * DAY_MS);
-      const key = date.toISOString().slice(0, 10);
-      col.push({
-        key,
-        active: activeDates.has(key),
-        isFuture: date.getTime() > today.getTime(),
-      });
-    }
-    columns.push(col);
-  }
 
   return (
     <main className="min-h-dvh px-6 pb-32 pt-[calc(env(safe-area-inset-top)+2.5rem)] md:pb-10 md:pl-72">
@@ -323,39 +297,14 @@ export default async function ProfilePage({
             )}
 
             <p className="mt-8 text-sm font-medium text-muted">
-              Last {WEEKS} weeks
+              Last {MONTHS} months
             </p>
-            <div className="mt-2 flex justify-center overflow-x-auto rounded-2xl border border-border bg-surface p-4">
-              <div className="flex gap-1">
-                <div className="flex flex-col gap-1 pr-1">
-                  {DAY_LABELS.map((label, d) => (
-                    <div
-                      key={d}
-                      className="flex h-3.5 w-3.5 items-center justify-center text-[9px] font-medium text-muted"
-                    >
-                      {label}
-                    </div>
-                  ))}
-                </div>
-                {columns.map((col, i) => (
-                  <div key={i} className="flex flex-col gap-1">
-                    {col.map((day) =>
-                      day.isFuture ? (
-                        <div key={day.key} className="h-3.5 w-3.5" />
-                      ) : (
-                        <div
-                          key={day.key}
-                          title={day.key}
-                          className={`h-3.5 w-3.5 rounded-[3px] ${
-                            day.active ? "bg-accent" : "bg-surface-2"
-                          }`}
-                        />
-                      )
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <ActivityHeatmap
+              activeDates={activeDates}
+              timeZone={timeZone}
+              months={MONTHS}
+              className="mt-2"
+            />
 
             <div className="mt-6 space-y-2">
               {activities.length === 0 && (
