@@ -16,6 +16,20 @@ export interface Activity {
   note: string | null;
   logged_at: string;
   created_at: string;
+  // "manual" for anything logged in-app; "strong" for workouts pushed in
+  // automatically from Apple Health. See migration 15.
+  source: string;
+  // Stable per-workout key for auto-logged rows (e.g. "strong:<iso>"),
+  // null for hand-logged ones. Deduplicates a repeatedly-firing Shortcut.
+  external_id: string | null;
+}
+
+export interface IntegrationToken {
+  id: string;
+  user_id: string;
+  label: string;
+  created_at: string;
+  last_used_at: string | null;
 }
 
 export type FriendshipStatus = "pending" | "accepted" | "declined";
