@@ -2,13 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import webpush from "web-push";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatDateKey } from "@/lib/date";
+import { isReminderDue } from "@/lib/reminders";
 
-// Runs once daily via Vercel Cron (see vercel.json) — the Hobby plan
-// caps any single cron job at once/day, so this can't personalize send
-// time to each person's local evening the way a paid-tier per-hour cron
-// could. It fires at whatever UTC hour vercel.json specifies; everyone
-// subscribed gets checked in that same run regardless of their own
-// timezone. See README.md for how to pick/adjust that hour.
+// Runs every hour, triggered from Supabase by pg_cron (see
+// supabase/hourly_reminders_cron.sql; Vercel's Hobby plan only allows its
+// own cron once a day). Each run only nudges the devices whose chosen
+// local hour it currently is (migration 18), and records the day it did
+// so, so an extra run in the same hour never sends twice.
 export const dynamic = "force-dynamic";
 
 const LOOKBACK_MS = 2 * 24 * 60 * 60 * 1000; // 2 days is plenty to cover "today" in any timezone
@@ -43,17 +43,19 @@ export async function GET(request: NextRequest) {
 
     const { data: subscriptions, error: subsError } = await supabase
       .from("push_subscriptions")
-      .select("endpoint, p256dh, auth, time_zone, user_id");
+      .select("endpoint, p256dh, auth, time_zone, user_id, reminder_hour, daily_reminder, last_reminded_on");
 
     if (subsError) {
       return NextResponse.json({ error: `push_subscriptions query failed: ${subsError.message}` }, { status: 500 });
     }
 
-    if (!subscriptions || subscriptions.length === 0) {
+    const now = new Date();
+    const due = (subscriptions ?? []).filter((s) => isReminderDue(s, now));
+    if (due.length === 0) {
       return NextResponse.json({ checked: 0, sent: 0, removedStale: 0 });
     }
 
-    const userIds = Array.from(new Set(subscriptions.map((s) => s.user_id)));
+    const userIds = Array.from(new Set(due.map((s) => s.user_id)));
     const { data: recentActivities, error: activitiesError } = await supabase
       .from("activities")
       .select("user_id, logged_at")
@@ -75,8 +77,14 @@ export async function GET(request: NextRequest) {
     const staleEndpoints: string[] = [];
     const errors: string[] = [];
 
-    for (const sub of subscriptions) {
-      const todayKey = formatDateKey(new Date(), sub.time_zone);
+    // Every due device is marked as handled for its local today, whether
+    // it gets a nudge or has already logged, so it isn't re-checked until
+    // tomorrow's run at its hour.
+    const handledByDay = new Map<string, string[]>();
+
+    for (const sub of due) {
+      const todayKey = formatDateKey(now, sub.time_zone);
+      handledByDay.set(todayKey, [...(handledByDay.get(todayKey) ?? []), sub.endpoint]);
       const loggedToday = (loggedAtByUser.get(sub.user_id) ?? []).some(
         (iso) => formatDateKey(new Date(iso), sub.time_zone) === todayKey
       );
@@ -106,12 +114,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    for (const [day, endpoints] of handledByDay) {
+      await supabase
+        .from("push_subscriptions")
+        .update({ last_reminded_on: day })
+        .in("endpoint", endpoints);
+    }
+
     if (staleEndpoints.length > 0) {
       await supabase.from("push_subscriptions").delete().in("endpoint", staleEndpoints);
     }
 
     return NextResponse.json({
-      checked: subscriptions.length,
+      checked: due.length,
       sent,
       removedStale: staleEndpoints.length,
       ...(errors.length > 0 ? { sendErrors: errors } : {}),

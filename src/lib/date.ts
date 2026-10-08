@@ -50,3 +50,15 @@ export function formatDisplayDate(iso: string, timeZone: string): string {
     day: "numeric",
   }).format(new Date(iso));
 }
+
+/** Hour of the day (0-23) for an instant, on the clock *in the given
+ * timezone*. Used to send each daily reminder at that person's chosen
+ * local hour. */
+export function localHour(date: Date, timeZone: string): number {
+  const hour = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "numeric",
+    hourCycle: "h23",
+  }).format(date);
+  return Number(hour) % 24;
+}

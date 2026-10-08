@@ -245,7 +245,7 @@ export default function WorkoutPage() {
   }
 
   async function enableNotifications() {
-    const ok = await subscribeToPush();
+    const ok = await subscribeToPush({ dailyReminder: false });
     setPush(ok ? "on" : "off");
     if (!ok) setError("Notifications weren't turned on. Check that Streakly is allowed to notify you.");
   }

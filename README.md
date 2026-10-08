@@ -335,14 +335,23 @@ with the phone locked, `/api/rest-timer` sends a push notification.
 That push needs the same setup as the daily reminder (VAPID keys and
 `SUPABASE_SERVICE_ROLE_KEY`, see "Push notifications" below), and the
 person has to tap **Turn on** in the workout screen. On iPhone that only
-works from the Home Screen app. Turning it on also subscribes that
-device to the daily reminder, since both share one push subscription.
+works from the Home Screen app. Turning it on there doesn't turn on the
+daily reminder (that's the `daily_reminder` flag from migration 18).
 
 The route waits out the rest inside the function (`after()` with
 `maxDuration = 300`), so rests are capped at 4:45. That relies on
 Vercel's Fluid compute (on by default for new projects), which allows
 300s on the Hobby plan. A `rest_timers` row per person makes sure a
 skipped or replaced rest never sends a stale notification.
+
+## Migration 18: choose the daily reminder time
+
+Run `supabase/migration_18_reminder_time.sql`, then set up the hourly
+schedule (step 7 of "Push notifications" below). Adds `reminder_hour`,
+`daily_reminder` and `last_reminded_on` to `push_subscriptions`. The
+reminder job now runs hourly and only nudges devices whose chosen local
+hour it is, at most once per local day. Turning the reminder off keeps
+the device subscribed, so workout rest alerts keep working.
 
 ## Short logs don't count toward the streak
 
@@ -442,22 +451,18 @@ infrastructure, not your machine):
 Vercel automatically sends `CRON_SECRET` as a bearer token on cron-invoked
 requests once it's set — no extra config needed for that part.
 
-**6. Redeploy.** `vercel.json` already defines the schedule:
+**6. Redeploy.**
 
-```json
-{ "schedule": "0 1 * * *" }
-```
+**7. Run the job every hour.** Each person picks their own reminder time
+(migration 18), so the job has to run hourly, but **Vercel's Hobby plan
+caps its cron at once per day**. Supabase's free pg_cron does it instead:
+enable the `pg_cron` and `pg_net` extensions (Database → Extensions), put
+your `CRON_SECRET` into `supabase/hourly_reminders_cron.sql`, and run it
+in the SQL editor. The once-a-day Vercel cron in `vercel.json` is left
+in place; it's harmless, since a device is never reminded twice in a day.
 
-That's 1am UTC daily — roughly 8-9pm US Eastern, 5-6pm US Pacific,
-depending on daylight saving. **Vercel's Hobby plan caps any single cron
-job at once per day** (a paid tier is required to run more often), so this
-one fixed UTC time is checked for everyone regardless of their own
-timezone — it can't personalize send time per person the way a proper
-notification system would on a paid plan. Adjust the hour in `vercel.json`
-if 1am UTC lands at an awkward time for your friend group.
-
-Once set up, anyone can turn reminders on/off from **Settings → Daily
-reminder**.
+Once set up, anyone can turn reminders on/off and pick the hour from
+**Settings → Daily reminder** (default 8 PM, in their own timezone).
 
 ## Testing
 

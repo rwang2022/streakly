@@ -35,8 +35,14 @@ export async function getExistingSubscription(): Promise<PushSubscription | null
  * service, and upserts the subscription into Supabase (RLS-scoped to the
  * signed-in user — no server route needed for this half, only for
  * actually *sending* pushes later, which needs the private VAPID key).
+ *
+ * `dailyReminder` sets whether this device also gets the daily nudge;
+ * the workout screen subscribes with `false`, since it only wants rest
+ * alerts (migrations 17 and 18).
  */
-export async function subscribeToPush(): Promise<boolean> {
+export async function subscribeToPush({
+  dailyReminder = true,
+}: { dailyReminder?: boolean } = {}): Promise<boolean> {
   if (!isPushSupported()) return false;
 
   const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -75,6 +81,7 @@ export async function subscribeToPush(): Promise<boolean> {
       p256dh: json.keys!.p256dh,
       auth: json.keys!.auth,
       time_zone: timeZone,
+      daily_reminder: dailyReminder,
     },
     { onConflict: "endpoint" }
   );
@@ -93,4 +100,37 @@ export async function unsubscribeFromPush(): Promise<void> {
     .eq("endpoint", subscription.endpoint);
 
   await subscription.unsubscribe();
+}
+
+export interface ReminderSettings {
+  dailyReminder: boolean;
+  reminderHour: number;
+}
+
+/** This device's daily-reminder settings, or null if it isn't subscribed. */
+export async function getReminderSettings(
+  subscription: PushSubscription
+): Promise<ReminderSettings | null> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("push_subscriptions")
+    .select("daily_reminder, reminder_hour")
+    .eq("endpoint", subscription.endpoint)
+    .maybeSingle();
+  if (!data) return null;
+  return { dailyReminder: data.daily_reminder, reminderHour: data.reminder_hour };
+}
+
+/** Updates this device's daily-reminder settings, keeping it subscribed
+ * (so workout rest alerts keep working when the daily nudge is off). */
+export async function updateReminderSettings(
+  subscription: PushSubscription,
+  settings: Partial<{ daily_reminder: boolean; reminder_hour: number }>
+): Promise<boolean> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("push_subscriptions")
+    .update(settings)
+    .eq("endpoint", subscription.endpoint);
+  return !error;
 }
