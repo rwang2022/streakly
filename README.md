@@ -274,37 +274,19 @@ insert through, so it now has an `is_admin_user()` escape hatch too —
 CHECK constraints can't hold a bare subquery the way RLS policies can,
 hence the wrapper function instead of an inline `exists (...)`.
 
-## Migration 15: Strong / Apple Health auto-logging
+## Migration 15: Strong / Apple Health auto-logging (removed)
 
-Run `supabase/migration_15_strong_integration.sql`. Lets a finished
-**Strong** (or any Apple Health) workout log itself as a Gym activity
-without opening the app.
-
-Strong has no API or webhooks, so the bridge is: Strong writes each
-session to Apple Health → a one-time **iOS Shortcut** personal automation
-("when Strong is closed") reads the latest Health workout and `POST`s it
-to `/api/integrations/strong` with a per-user bearer token. That route
-runs with `SUPABASE_SERVICE_ROLE_KEY` (same key the cron reminder job
-already uses — no new env var) and inserts the row on the user's behalf.
-
-The migration adds `activities.source` (`'manual'` vs `'strong'`) and
-`activities.external_id` with a partial unique index on
-`(user_id, external_id)` so the Shortcut firing on every app-close can't
-create duplicates, plus an `integration_tokens` table holding only the
-SHA-256 of each token (the raw value is shown once, in **Settings →
-Strong / Apple Health**, which also has the full Shortcut recipe).
-
-The `activities_logged_at_reasonable` CHECK (Migration 5) is deliberately
-left untouched — workouts older than 24h are skipped rather than
-backdated in, since that guard is what stops streak inflation. The
-12/day rate-limit trigger (Migration 6) still applies too; both
-rejections come back as `{ ok: true, skipped: ... }` so a misbehaving
-automation never retry-storms.
+This tried to auto-log Strong workouts through Apple Health and an iOS
+Shortcut, but Shortcuts can't read workouts from Apple Health, so it
+never worked. The code is gone; the workout tracker (Migration 16)
+replaces it. If you ran `migration_15_strong_integration.sql`, run
+`migration_19_remove_strong_integration.sql` to drop what it added. If
+you never ran 15, skip both.
 
 ## Migration 16: workout tracker (sets, reps, weight)
 
-Run `supabase/migration_16_workout_sets.sql`. Adds a Strong-style
-workout logger at `/workout` (linked from the top of the Log page):
+Run `supabase/migration_16_workout_sets.sql`. Adds a workout
+logger (sets, reps and weight, like the Strong app) at `/workout` (linked from the top of the Log page):
 start a workout, add exercises, fill in weight and reps per set, then
 Finish. The "Previous" column shows what you did for that exercise last
 time; tap it to copy those numbers in.
