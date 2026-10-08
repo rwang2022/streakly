@@ -68,7 +68,9 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    // THEME_INIT_SCRIPT adds classes to <html> before React hydrates, so
+    // its className is expected to differ from the server render.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: TIMEZONE_INIT_SCRIPT }} />
