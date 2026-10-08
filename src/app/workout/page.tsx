@@ -1,14 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Dumbbell, Plus, Trash2, X } from "lucide-react";
+import { Bell, Check, Dumbbell, Minus, Plus, Timer, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { ExercisePicker } from "@/components/ExercisePicker";
+import { getExistingSubscription, isPushSupported, subscribeToPush } from "@/lib/push";
 import {
+  DEFAULT_REST_SECONDS,
+  REST_STEP_SECONDS,
   WORKOUT_DRAFT_KEY as DRAFT_KEY,
   buildSetPayload,
+  clampRestSeconds,
   equipmentLabel,
   formatElapsed,
   formatSet,
@@ -25,6 +29,7 @@ import {
 // throw (private mode, cleared site data), so every access is guarded and
 // the page still works without it — you'd just lose the draft on close.
 const UNIT_KEY = "streakly-weight-unit";
+const REST_KEY = "streakly-rest-seconds";
 
 function readDraft(): DraftWorkout | null {
   try {
@@ -52,6 +57,45 @@ function readUnit(): WeightUnit {
   }
 }
 
+function readRestSeconds(): number {
+  try {
+    const n = Number(localStorage.getItem(REST_KEY));
+    return n > 0 ? clampRestSeconds(n) : DEFAULT_REST_SECONDS;
+  } catch {
+    return DEFAULT_REST_SECONDS;
+  }
+}
+
+// Tells the server about the rest countdown so it can push a "rest's
+// over" notification to a locked phone (see /api/rest-timer). Best
+// effort: the in-app countdown works regardless.
+function syncRestTimer(seconds: number | null) {
+  fetch("/api/rest-timer", {
+    method: seconds === null ? "DELETE" : "POST",
+    headers: { "Content-Type": "application/json" },
+    body: seconds === null ? undefined : JSON.stringify({ seconds }),
+  }).catch(() => {});
+}
+
+// Two short beeps. Needs an AudioContext that was created/resumed during
+// a tap, which toggleDone() takes care of.
+function chime(ctx: AudioContext | null) {
+  if (!ctx) return;
+  try {
+    [0, 0.25].forEach((offset) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + offset);
+      gain.gain.exponentialRampToValueAtTime(0.3, ctx.currentTime + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + offset + 0.18);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + offset);
+      osc.stop(ctx.currentTime + offset + 0.2);
+    });
+  } catch {}
+}
+
 let keyCounter = 0;
 function newKey() {
   keyCounter += 1;
@@ -69,6 +113,10 @@ export default function WorkoutPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // null = still checking; "unsupported" = e.g. Safari tab, not Home Screen.
+  const [push, setPush] = useState<"on" | "off" | "unsupported" | null>(null);
+  const [restOver, setRestOver] = useState(false);
+  const audioRef = useRef<AudioContext | null>(null);
 
   // Fetches what this person did last time for each named exercise, for
   // the "Previous" column. Missing table (migration 16 not run yet) or no
@@ -111,9 +159,33 @@ export default function WorkoutPage() {
 
   useEffect(() => {
     if (!workout) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
   }, [workout]);
+
+  useEffect(() => {
+    if (!isPushSupported()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPush("unsupported");
+      return;
+    }
+    getExistingSubscription()
+      .then((sub) => setPush(sub ? "on" : "off"))
+      .catch(() => setPush("off"));
+  }, []);
+
+  // Rest ran out while the app was open: chime and flash a banner. (When
+  // it's in the background the server's push notification covers it.)
+  const restEndsAt = workout?.rest?.endsAt ?? null;
+  useEffect(() => {
+    if (restEndsAt === null || now < restEndsAt) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setWorkout((w) => (w ? { ...w, rest: null } : w));
+    setRestOver(true);
+    chime(audioRef.current);
+    const id = setTimeout(() => setRestOver(false), 4000);
+    return () => clearTimeout(id);
+  }, [now, restEndsAt]);
 
   // Mirror every change into storage. Gated on `loaded` so the initial
   // null state can't wipe a saved draft before it's been read back.
@@ -128,7 +200,100 @@ export default function WorkoutPage() {
   function start() {
     setError(null);
     setNow(Date.now());
-    update({ startedAt: new Date().toISOString(), note: "", unit: readUnit(), exercises: [] });
+    update({
+      startedAt: new Date().toISOString(),
+      note: "",
+      unit: readUnit(),
+      exercises: [],
+      restSeconds: readRestSeconds(),
+      rest: null,
+    });
+  }
+
+  function setRestSeconds(seconds: number) {
+    if (!workout) return;
+    const next = clampRestSeconds(seconds);
+    try {
+      localStorage.setItem(REST_KEY, String(next));
+    } catch {}
+    update({ ...workout, restSeconds: next });
+  }
+
+  // ±15s on a running countdown. Also nudges the default for next time,
+  // since that's usually what you meant.
+  function adjustRest(delta: number) {
+    if (!workout?.rest) return;
+    const remaining = Math.ceil((workout.rest.endsAt - Date.now()) / 1000) + delta;
+    if (remaining <= 0) return skipRest();
+    const seconds = clampRestSeconds(remaining);
+    const restSeconds = clampRestSeconds((workout.restSeconds ?? DEFAULT_REST_SECONDS) + delta);
+    try {
+      localStorage.setItem(REST_KEY, String(restSeconds));
+    } catch {}
+    update({
+      ...workout,
+      restSeconds,
+      rest: { endsAt: Date.now() + seconds * 1000, total: Math.max(workout.rest.total, seconds) },
+    });
+    if (push === "on") syncRestTimer(seconds);
+  }
+
+  function skipRest() {
+    if (!workout) return;
+    update({ ...workout, rest: null });
+    if (push === "on") syncRestTimer(null);
+  }
+
+  async function enableNotifications() {
+    const ok = await subscribeToPush();
+    setPush(ok ? "on" : "off");
+    if (!ok) setError("Notifications weren't turned on. Check that Streakly is allowed to notify you.");
+  }
+
+  // Tick a set off (or un-tick it). Ticking an empty set copies last
+  // time's numbers in, like Strong, then starts the rest countdown.
+  function toggleDone(key: string, index: number) {
+    if (!workout) return;
+    // Created inside a tap so iOS lets it make sound later.
+    try {
+      audioRef.current ??= new AudioContext();
+      audioRef.current.resume().catch(() => {});
+    } catch {}
+
+    const ex = workout.exercises.find((e) => e.key === key);
+    const set = ex?.sets[index];
+    if (!ex || !set) return;
+    if (set.done) {
+      updateExercise(key, (e) => ({
+        ...e,
+        sets: e.sets.map((s, i) => (i === index ? { ...s, done: false } : s)),
+      }));
+      return;
+    }
+
+    const prev = (previous[ex.name] ?? [])[index];
+    const filled = {
+      weight:
+        set.weight || (prev?.weight !== null && Number(prev?.weight) > 0 ? String(Number(prev?.weight)) : ""),
+      reps: set.reps || (prev?.reps ? String(prev.reps) : ""),
+    };
+    if (!(Number(filled.reps) > 0)) {
+      setError("Enter reps for that set first.");
+      return;
+    }
+    setError(null);
+    const seconds = workout.restSeconds ?? DEFAULT_REST_SECONDS;
+    update({
+      ...workout,
+      exercises: workout.exercises.map((e) =>
+        e.key === key
+          ? { ...e, sets: e.sets.map((s, i) => (i === index ? { ...filled, done: true } : s)) }
+          : e
+      ),
+      rest: { endsAt: Date.now() + seconds * 1000, total: seconds },
+    });
+    setRestOver(false);
+    if (push === "on") syncRestTimer(seconds);
   }
 
   function discard() {
@@ -138,6 +303,7 @@ export default function WorkoutPage() {
       return;
     }
     setConfirmDiscard(false);
+    if (workout?.rest && push === "on") syncRestTimer(null);
     setWorkout(null);
     setError(null);
   }
@@ -250,6 +416,7 @@ export default function WorkoutPage() {
       return;
     }
 
+    if (workout.rest && push === "on") syncRestTimer(null);
     writeDraft(null);
     setSaved(true);
     setTimeout(() => router.push("/history"), 450);
@@ -285,7 +452,7 @@ export default function WorkoutPage() {
   }
 
   return (
-    <main className="min-h-dvh px-4 pb-32 md:pb-10 md:pl-72">
+    <main className="min-h-dvh px-4 pb-56 md:pb-32 md:pl-72">
       <div className="sticky top-0 z-10 -mx-4 border-b border-border bg-background/90 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+1rem)] backdrop-blur-lg md:-ml-8">
         <div className="mx-auto flex max-w-md items-center justify-between gap-3 md:max-w-2xl">
           <div>
@@ -333,6 +500,52 @@ export default function WorkoutPage() {
           </div>
         </div>
 
+        <div className="mt-3 flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-2.5">
+          <span className="flex items-center gap-2 text-sm text-muted">
+            <Timer size={16} /> Rest between sets
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setRestSeconds((workout.restSeconds ?? DEFAULT_REST_SECONDS) - REST_STEP_SECONDS)}
+              aria-label="Shorter rest"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-2"
+            >
+              <Minus size={14} />
+            </button>
+            <span className="w-12 text-center text-sm font-medium tabular-nums">
+              {formatElapsed((workout.restSeconds ?? DEFAULT_REST_SECONDS) * 1000)}
+            </span>
+            <button
+              onClick={() => setRestSeconds((workout.restSeconds ?? DEFAULT_REST_SECONDS) + REST_STEP_SECONDS)}
+              aria-label="Longer rest"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-2"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+        </div>
+
+        {push === "off" && (
+          <div className="mt-3 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3">
+            <Bell size={18} className="shrink-0 text-accent" />
+            <p className="flex-1 text-xs text-muted">
+              Get a notification when rest is over, even with your phone locked.
+            </p>
+            <button
+              onClick={enableNotifications}
+              className="shrink-0 rounded-xl bg-foreground px-3 py-2 text-xs font-medium text-background"
+            >
+              Turn on
+            </button>
+          </div>
+        )}
+        {push === "unsupported" && (
+          <p className="mt-3 rounded-2xl border border-border bg-surface px-4 py-3 text-xs text-muted">
+            To get rest notifications on iPhone, add Streakly to your Home Screen
+            (Share, then Add to Home Screen) and open it from there.
+          </p>
+        )}
+
         {error && (
           <p className="mt-4 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
             {error}
@@ -358,7 +571,7 @@ export default function WorkoutPage() {
                   </button>
                 </div>
 
-                <div className="mt-3 grid grid-cols-[2rem_1fr_4.5rem_4rem_2rem] items-center gap-x-2 gap-y-2 text-sm">
+                <div className="mt-3 grid grid-cols-[2rem_1fr_4.5rem_4rem_2.25rem] items-center gap-x-2 gap-y-2 text-sm">
                   <span className="text-center text-[11px] font-medium uppercase text-muted">Set</span>
                   <span className="text-[11px] font-medium uppercase text-muted">Previous</span>
                   <span className="text-center text-[11px] font-medium uppercase text-muted">{workout.unit}</span>
@@ -366,6 +579,9 @@ export default function WorkoutPage() {
                   <span />
                   {ex.sets.map((s, i) => {
                     const p = prior[i];
+                    const inputClass = `w-full rounded-lg px-2 py-2 text-center tabular-nums outline-none focus:ring-2 focus:ring-accent/40 ${
+                      s.done ? "bg-success/15" : "bg-surface-2"
+                    }`;
                     return (
                       <div key={i} className="contents">
                         <span className="text-center font-medium text-muted">{i + 1}</span>
@@ -386,7 +602,7 @@ export default function WorkoutPage() {
                           inputMode="decimal"
                           placeholder={p?.weight ? String(Number(p.weight)) : "0"}
                           aria-label={`Set ${i + 1} weight`}
-                          className="w-full rounded-lg bg-surface-2 px-2 py-2 text-center tabular-nums outline-none focus:ring-2 focus:ring-accent/40"
+                          className={inputClass}
                         />
                         <input
                           value={s.reps}
@@ -394,36 +610,45 @@ export default function WorkoutPage() {
                           inputMode="numeric"
                           placeholder={p?.reps ? String(p.reps) : "0"}
                           aria-label={`Set ${i + 1} reps`}
-                          className="w-full rounded-lg bg-surface-2 px-2 py-2 text-center tabular-nums outline-none focus:ring-2 focus:ring-accent/40"
+                          className={inputClass}
                         />
                         <button
-                          onClick={() =>
-                            updateExercise(ex.key, (e) =>
-                              e.sets.length > 1 ? { ...e, sets: e.sets.filter((_, j) => j !== i) } : e
-                            )
-                          }
-                          disabled={ex.sets.length <= 1}
-                          aria-label={`Delete set ${i + 1}`}
-                          className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface-2 disabled:opacity-30"
+                          onClick={() => toggleDone(ex.key, i)}
+                          aria-label={s.done ? `Set ${i + 1} done, tap to undo` : `Mark set ${i + 1} done`}
+                          aria-pressed={Boolean(s.done)}
+                          className={`flex h-9 w-9 items-center justify-center rounded-lg transition active:scale-90 ${
+                            s.done ? "bg-success text-white" : "bg-surface-2 text-muted"
+                          }`}
                         >
-                          <Trash2 size={14} />
+                          <Check size={16} strokeWidth={2.6} />
                         </button>
                       </div>
                     );
                   })}
                 </div>
 
-                <button
-                  onClick={() =>
-                    updateExercise(ex.key, (e) => ({
-                      ...e,
-                      sets: [...e.sets, { weight: e.sets.at(-1)?.weight ?? "", reps: "" }],
-                    }))
-                  }
-                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-surface-2 py-2.5 text-sm font-medium"
-                >
-                  <Plus size={16} /> Add set
-                </button>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() =>
+                      updateExercise(ex.key, (e) => ({
+                        ...e,
+                        sets: [...e.sets, { weight: e.sets.at(-1)?.weight ?? "", reps: "" }],
+                      }))
+                    }
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-surface-2 py-2.5 text-sm font-medium"
+                  >
+                    <Plus size={16} /> Add set
+                  </button>
+                  {ex.sets.length > 1 && (
+                    <button
+                      onClick={() => updateExercise(ex.key, (e) => ({ ...e, sets: e.sets.slice(0, -1) }))}
+                      aria-label="Remove last set"
+                      className="flex items-center justify-center rounded-xl bg-surface-2 px-4 py-2.5 text-muted"
+                    >
+                      <Minus size={16} />
+                    </button>
+                  )}
+                </div>
               </section>
             );
           })}
@@ -443,6 +668,59 @@ export default function WorkoutPage() {
           {confirmDiscard ? "Tap again to discard this workout" : "Discard workout"}
         </button>
       </div>
+
+      {(workout.rest || restOver) && (
+        <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5.25rem)] z-30 px-4 md:bottom-6 md:left-64">
+          <div
+            role="timer"
+            aria-live="polite"
+            className="mx-auto max-w-md overflow-hidden rounded-2xl border border-border bg-surface shadow-lg md:max-w-2xl"
+          >
+            {workout.rest ? (
+              <>
+                <div className="h-1 bg-surface-2">
+                  <div
+                    className="h-full bg-accent transition-[width] duration-200 ease-linear"
+                    style={{
+                      width: `${Math.max(0, Math.min(100, ((workout.rest.endsAt - now) / (workout.rest.total * 1000)) * 100))}%`,
+                    }}
+                  />
+                </div>
+                <div className="flex items-center gap-2 px-4 py-3">
+                  <div className="flex-1">
+                    <p className="text-xs text-muted">Rest</p>
+                    <p className="text-xl font-semibold tabular-nums">
+                      {formatElapsed(Math.max(0, workout.rest.endsAt - now) + 999)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => adjustRest(-REST_STEP_SECONDS)}
+                    className="rounded-xl bg-surface-2 px-3 py-2 text-sm font-medium tabular-nums"
+                  >
+                    −{REST_STEP_SECONDS}
+                  </button>
+                  <button
+                    onClick={() => adjustRest(REST_STEP_SECONDS)}
+                    className="rounded-xl bg-surface-2 px-3 py-2 text-sm font-medium tabular-nums"
+                  >
+                    +{REST_STEP_SECONDS}
+                  </button>
+                  <button
+                    onClick={skipRest}
+                    className="rounded-xl bg-foreground px-3 py-2 text-sm font-medium text-background"
+                  >
+                    Skip
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="flex items-center gap-2 px-4 py-4 font-semibold text-success">
+                <Timer size={18} /> Rest&apos;s over. Time for your next set.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {picking && <ExercisePicker onPick={addExercise} onClose={() => setPicking(false)} />}
       <BottomNav />

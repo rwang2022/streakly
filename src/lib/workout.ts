@@ -17,6 +17,8 @@ export const EXERCISES = exerciseData as Exercise[];
 export interface DraftSet {
   weight: string;
   reps: string;
+  // Ticked off. Starts the rest timer; doesn't affect what gets saved.
+  done?: boolean;
 }
 
 export interface DraftExercise {
@@ -35,6 +37,10 @@ export interface DraftWorkout {
   note: string;
   unit: WeightUnit;
   exercises: DraftExercise[];
+  // Rest length used each time a set is ticked off.
+  restSeconds?: number;
+  // The running rest countdown, if any (epoch ms).
+  rest?: { endsAt: number; total: number } | null;
 }
 
 /** Row shape the log_workout() Postgres function expects (migration 16). */
@@ -211,3 +217,13 @@ export function groupSetsByExercise(sets: SavedSet[]): ExerciseSummary[] {
 
 /** localStorage key for the in-progress workout (see src/app/workout). */
 export const WORKOUT_DRAFT_KEY = "streakly-active-workout";
+
+export const DEFAULT_REST_SECONDS = 90;
+export const REST_STEP_SECONDS = 15;
+// /api/rest-timer waits inside a serverless function with a 300s limit,
+// so rests are capped a little under that.
+export const MAX_REST_SECONDS = 285;
+
+export function clampRestSeconds(seconds: number): number {
+  return Math.min(MAX_REST_SECONDS, Math.max(REST_STEP_SECONDS, Math.round(seconds)));
+}

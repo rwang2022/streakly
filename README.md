@@ -325,6 +325,25 @@ and run `node scripts/build-exercises.mjs path/to/exercises.json`.
 An in-progress workout is kept in the browser's localStorage, so
 closing the app mid-workout doesn't lose it.
 
+## Migration 17: rest timer notifications
+
+Run `supabase/migration_17_rest_timers.sql`. Ticking off a set in the
+workout tracker starts a rest countdown (default 1:30, adjustable,
+remembered per device). With the app open it chimes when rest is over;
+with the phone locked, `/api/rest-timer` sends a push notification.
+
+That push needs the same setup as the daily reminder (VAPID keys and
+`SUPABASE_SERVICE_ROLE_KEY`, see "Push notifications" below), and the
+person has to tap **Turn on** in the workout screen. On iPhone that only
+works from the Home Screen app. Turning it on also subscribes that
+device to the daily reminder, since both share one push subscription.
+
+The route waits out the rest inside the function (`after()` with
+`maxDuration = 300`), so rests are capped at 4:45. That relies on
+Vercel's Fluid compute (on by default for new projects), which allows
+300s on the Hobby plan. A `rest_timers` row per person makes sure a
+skipped or replaced rest never sends a stale notification.
+
 ## Short logs don't count toward the streak
 
 No migration needed — this is pure application logic in

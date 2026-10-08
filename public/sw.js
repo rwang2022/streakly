@@ -37,7 +37,8 @@ self.addEventListener("fetch", (event) => {
 });
 
 // Daily reminder push, sent by /api/cron/reminders. Payload is a small
-// JSON blob: { title, body, url }.
+// JSON blob: { title, body, url, tag? }. Also used for the workout
+// tracker's rest-over alert, sent by /api/rest-timer.
 self.addEventListener("push", (event) => {
   let payload = { title: "Streakly", body: "Don't break the streak.", url: "/dashboard" };
   try {
@@ -52,6 +53,9 @@ self.addEventListener("push", (event) => {
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
       data: { url: payload.url },
+      // A tag (e.g. "rest-timer") replaces the previous notification of
+      // the same kind instead of stacking them up.
+      ...(payload.tag ? { tag: payload.tag, renotify: true } : {}),
     })
   );
 });
