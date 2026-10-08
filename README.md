@@ -301,6 +301,30 @@ backdated in, since that guard is what stops streak inflation. The
 rejections come back as `{ ok: true, skipped: ... }` so a misbehaving
 automation never retry-storms.
 
+## Migration 16: workout tracker (sets, reps, weight)
+
+Run `supabase/migration_16_workout_sets.sql`. Adds a Strong-style
+workout logger at `/workout` (linked from the top of the Log page):
+start a workout, add exercises, fill in weight and reps per set, then
+Finish. The "Previous" column shows what you did for that exercise last
+time; tap it to copy those numbers in.
+
+A finished workout is still one ordinary Gym activity (duration = time
+from Start to Finish), so streaks, scoring and the existing guardrails
+all apply unchanged. The detail lives in a new `workout_sets` table,
+saved together with the activity in one transaction by the
+`log_workout()` function, and deleted with it. History shows the
+breakdown under each workout.
+
+The exercise list (`src/data/exercises.json`, 753 exercises with their
+equipment) comes from [Free Exercise DB](https://github.com/yuhonas/free-exercise-db),
+which is public domain (Unlicense). Stretches, images and instructions
+are left out. To refresh it, download that repo's `dist/exercises.json`
+and run `node scripts/build-exercises.mjs path/to/exercises.json`.
+
+An in-progress workout is kept in the browser's localStorage, so
+closing the app mid-workout doesn't lose it.
+
 ## Short logs don't count toward the streak
 
 No migration needed — this is pure application logic in

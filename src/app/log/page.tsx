@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Dumbbell, Mountain, PersonStanding, Zap, Sparkles, Check } from "lucide-react";
+import { Dumbbell, Mountain, PersonStanding, Zap, Sparkles, Check, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import type { ActivityType } from "@/lib/types";
+import { WORKOUT_DRAFT_KEY } from "@/lib/workout";
 
 const TYPES: { value: ActivityType; label: string; icon: React.ReactNode }[] = [
   { value: "gym", label: "Gym", icon: <Dumbbell size={20} /> },
@@ -23,6 +25,15 @@ export default function LogActivityPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [workoutInProgress, setWorkoutInProgress] = useState(false);
+
+  useEffect(() => {
+    try {
+      // localStorage only exists after mount.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setWorkoutInProgress(Boolean(localStorage.getItem(WORKOUT_DRAFT_KEY)));
+    } catch {}
+  }, []);
 
   async function handleSave() {
     setError(null);
@@ -89,7 +100,29 @@ export default function LogActivityPage() {
           Showing up today is what moves the needle.
         </p>
 
-        <div className="mt-6 grid grid-cols-3 gap-3">
+        <Link
+          href="/workout"
+          className="mt-6 flex items-center gap-3 rounded-2xl border border-accent/40 bg-accent/10 px-4 py-4 transition active:scale-[0.98]"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent-2 to-accent text-white">
+            <Dumbbell size={20} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">
+              {workoutInProgress ? "Resume workout" : "Start a strength workout"}
+            </p>
+            <p className="text-xs text-muted">
+              {workoutInProgress
+                ? "You have a workout in progress."
+                : "Track exercises, sets and weights as you go."}
+            </p>
+          </div>
+          <ChevronRight size={18} className="shrink-0 text-muted" />
+        </Link>
+
+        <p className="mt-6 text-sm font-medium text-muted">Or log a quick activity</p>
+
+        <div className="mt-3 grid grid-cols-3 gap-3">
           {TYPES.map((t) => (
             <button
               key={t.value}

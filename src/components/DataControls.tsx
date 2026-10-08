@@ -24,25 +24,31 @@ export function DataControls() {
       return;
     }
 
-    const [{ data: profile }, { data: activities }, { data: friendships }] =
-      await Promise.all([
-        supabase.from("profiles").select("*").eq("id", user.id).single(),
-        supabase
-          .from("activities")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("logged_at", { ascending: false }),
-        supabase
-          .from("friendships")
-          .select("*")
-          .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`),
-      ]);
+    const [
+      { data: profile },
+      { data: activities },
+      { data: friendships },
+      { data: workoutSets },
+    ] = await Promise.all([
+      supabase.from("profiles").select("*").eq("id", user.id).single(),
+      supabase
+        .from("activities")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("logged_at", { ascending: false }),
+      supabase
+        .from("friendships")
+        .select("*")
+        .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`),
+      supabase.from("workout_sets").select("*").eq("user_id", user.id),
+    ]);
 
     const payload = {
       exported_at: new Date().toISOString(),
       profile,
       activities: activities ?? [],
       friendships: friendships ?? [],
+      workout_sets: workoutSets ?? [],
     };
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
