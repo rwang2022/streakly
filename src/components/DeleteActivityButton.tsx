@@ -5,7 +5,15 @@ import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-export function DeleteActivityButton({ activityId }: { activityId: string }) {
+// `imported` deletes a workout imported from Strong (migration 20)
+// instead of a logged activity; its sets go with it either way.
+export function DeleteActivityButton({
+  activityId,
+  imported = false,
+}: {
+  activityId: string;
+  imported?: boolean;
+}) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -18,7 +26,10 @@ export function DeleteActivityButton({ activityId }: { activityId: string }) {
     }
     setBusy(true);
     const supabase = createClient();
-    await supabase.from("activities").delete().eq("id", activityId);
+    await supabase
+      .from(imported ? "imported_workouts" : "activities")
+      .delete()
+      .eq("id", activityId);
     router.refresh();
   }
 

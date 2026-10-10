@@ -29,6 +29,7 @@ export function DataControls() {
       { data: activities },
       { data: friendships },
       { data: workoutSets },
+      { data: importedWorkouts },
     ] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", user.id).single(),
       supabase
@@ -41,6 +42,7 @@ export function DataControls() {
         .select("*")
         .or(`requester_id.eq.${user.id},addressee_id.eq.${user.id}`),
       supabase.from("workout_sets").select("*").eq("user_id", user.id),
+      supabase.from("imported_workouts").select("*").eq("user_id", user.id),
     ]);
 
     const payload = {
@@ -49,6 +51,7 @@ export function DataControls() {
       activities: activities ?? [],
       friendships: friendships ?? [],
       workout_sets: workoutSets ?? [],
+      imported_workouts: importedWorkouts ?? [],
     };
 
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
@@ -84,6 +87,7 @@ export function DataControls() {
     // account deletion, which would require Supabase's admin API.
     await Promise.all([
       supabase.from("activities").delete().eq("user_id", user.id),
+      supabase.from("imported_workouts").delete().eq("user_id", user.id),
       supabase
         .from("friendships")
         .delete()

@@ -116,6 +116,7 @@ export default function WorkoutPage() {
   // null = still checking; "unsupported" = e.g. Safari tab, not Home Screen.
   const [push, setPush] = useState<"on" | "off" | "unsupported" | null>(null);
   const [restOver, setRestOver] = useState(false);
+  const [yourExercises, setYourExercises] = useState<string[]>([]);
   const audioRef = useRef<AudioContext | null>(null);
 
   // Fetches what this person did last time for each named exercise, for
@@ -134,10 +135,14 @@ export default function WorkoutPage() {
         names.map(async (name) => {
           const { data } = await supabase
             .from("workout_sets")
-            .select("activity_id, exercise_name, exercise_position, set_number, weight, reps, unit")
+            .select(
+              "activity_id, imported_workout_id, performed_at, exercise_name, exercise_position, set_number, weight, reps, unit"
+            )
             .eq("user_id", user.id)
             .eq("exercise_name", name)
-            .order("created_at", { ascending: false })
+            // performed_at, not created_at: imported Strong history was
+            // created at import time but performed months earlier.
+            .order("performed_at", { ascending: false })
             .limit(40);
           return [name, lastSessionSets((data ?? []) as SavedSet[])] as const;
         })
@@ -162,6 +167,30 @@ export default function WorkoutPage() {
     const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
   }, [workout]);
+
+  // Names from this person's own history that Free Exercise DB doesn't
+  // have (custom exercises, imported Strong names), for the picker.
+  useEffect(() => {
+    if (!picking) return;
+    (async () => {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user) return;
+      const { data } = await supabase
+        .from("workout_sets")
+        .select("exercise_name")
+        .eq("user_id", session.user.id)
+        .is("exercise_id", null)
+        .order("created_at", { ascending: false })
+        .limit(1000);
+      const names = Array.from(
+        new Set((data ?? []).map((r: { exercise_name: string }) => r.exercise_name))
+      );
+      setYourExercises(names);
+    })();
+  }, [picking]);
 
   useEffect(() => {
     if (!isPushSupported()) {
@@ -722,7 +751,13 @@ export default function WorkoutPage() {
         </div>
       )}
 
-      {picking && <ExercisePicker onPick={addExercise} onClose={() => setPicking(false)} />}
+      {picking && (
+        <ExercisePicker
+          onPick={addExercise}
+          onClose={() => setPicking(false)}
+          yourExercises={yourExercises}
+        />
+      )}
       <BottomNav />
     </main>
   );

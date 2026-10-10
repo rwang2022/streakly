@@ -54,9 +54,13 @@ export interface SetPayload {
   unit: WeightUnit;
 }
 
-/** A saved set, as read back from workout_sets. */
+/** A saved set, as read back from workout_sets. It belongs to either a
+ * workout logged in the app (activity_id) or one imported from Strong
+ * (imported_workout_id, migration 20). */
 export interface SavedSet {
-  activity_id: string;
+  activity_id: string | null;
+  imported_workout_id?: string | null;
+  performed_at?: string;
   exercise_name: string;
   exercise_position: number;
   set_number: number;
@@ -191,10 +195,15 @@ export function formatSet(set: { weight: number | null; reps: number | null; uni
  */
 export function lastSessionSets(recentSets: SavedSet[]): SavedSet[] {
   if (recentSets.length === 0) return [];
-  const latest = recentSets[0].activity_id;
+  const latest = sessionKey(recentSets[0]);
   return recentSets
-    .filter((s) => s.activity_id === latest)
+    .filter((s) => sessionKey(s) === latest)
     .sort((a, b) => a.set_number - b.set_number);
+}
+
+/** Which workout a set came from, logged or imported. */
+export function sessionKey(set: SavedSet): string {
+  return set.activity_id ?? `imported:${set.imported_workout_id ?? ""}`;
 }
 
 export interface ExerciseSummary {

@@ -10,11 +10,16 @@ import {
 } from "@/lib/workout";
 
 /** Full-screen search over Free Exercise DB, with equipment filter chips
- * and a "custom exercise" fallback for anything the list doesn't have. */
+ * and a "custom exercise" fallback for anything the list doesn't have.
+ * `yourExercises` are names from the person's own history that aren't in
+ * that list (custom ones, or Strong's names like "Bench Press (Barbell)"
+ * from an import), shown first so their Previous numbers line up. */
 export function ExercisePicker({
   onPick,
   onClose,
+  yourExercises = [],
 }: {
+  yourExercises?: string[];
   onPick: (
     exercise: Exercise | { id: null; name: string; equipment: null },
   ) => void;
@@ -33,6 +38,16 @@ export function ExercisePicker({
     [query, equipment],
   );
   const customName = query.trim().slice(0, 120);
+  const yours = useMemo(() => {
+    if (equipment) return [];
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    return yourExercises
+      .filter((n) => words.every((w) => n.toLowerCase().includes(w)))
+      .slice(0, 20);
+  }, [query, equipment, yourExercises]);
+  const exactMatch =
+    yours.some((n) => n.toLowerCase() === customName.toLowerCase()) ||
+    results.some((e) => e.name.toLowerCase() === customName.toLowerCase());
 
   return (
     <div
@@ -80,7 +95,26 @@ export function ExercisePicker({
       </div>
 
       <div className="mx-auto w-full max-w-md flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-3 md:max-w-2xl">
-        {customName && (
+        {yours.length > 0 && (
+          <>
+            <p className="mb-2 px-1 text-[11px] font-medium uppercase text-muted">
+              Your exercises
+            </p>
+            <ul className="mb-4 divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
+              {yours.map((name) => (
+                <li key={name}>
+                  <button
+                    onClick={() => onPick({ id: null, name, equipment: null })}
+                    className="w-full px-4 py-3 text-left text-sm font-medium transition hover:bg-surface-2"
+                  >
+                    {name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {customName && !exactMatch && (
           <button
             onClick={() =>
               onPick({ id: null, name: customName, equipment: null })

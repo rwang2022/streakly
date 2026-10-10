@@ -335,6 +335,26 @@ reminder job now runs hourly and only nudges devices whose chosen local
 hour it is, at most once per local day. Turning the reminder off keeps
 the device subscribed, so workout rest alerts keep working.
 
+## Migration 20: import history from Strong
+
+Run `supabase/migration_20_strong_import.sql`. **Settings → Import from
+Strong** reads the CSV that Strong exports (Settings → Export Strong
+Data) in the browser (`src/lib/strongImport.ts`), groups its rows into
+workouts, and saves them through `import_workouts()`.
+
+Imported workouts are history only: they appear in History (tagged
+"Imported from Strong", not on the heatmap) and feed the workout
+tracker's "Previous" numbers, but they live in `imported_workouts`, not
+`activities`, so they never count toward streak, score or the
+leaderboard. That keeps the 24-hour backdating guard meaningful.
+Re-importing the same file skips workouts already imported. Strong's
+exercise names ("Bench Press (Barbell)") are kept as-is and show under
+"Your exercises" in the exercise picker.
+
+The migration also adds `workout_sets.performed_at` (backfilled from each
+workout's date) so "Previous" sorts by when sets were done, and lets a
+set belong to either an activity or an imported workout.
+
 ## Short logs don't count toward the streak
 
 No migration needed — this is pure application logic in
