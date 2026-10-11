@@ -355,6 +355,23 @@ The migration also adds `workout_sets.performed_at` (backfilled from each
 workout's date) so "Previous" sorts by when sets were done, and lets a
 set belong to either an activity or an imported workout.
 
+## Migration 21: workout templates
+
+Run `supabase/migration_21_workout_templates.sql`. Adds
+`workout_templates`: a name plus a list of exercises with a set count
+each, like Strong's templates. Weights and reps aren't stored; starting a
+template gives empty sets and the "Previous" column fills in last time's
+numbers as usual. Templates are private to their owner.
+
+- **Save as template**: during a workout (below Add exercise), or under
+  any past or imported workout in History (expand its exercises). It's
+  named after the workout, or "Workout Oct 9" if it has no name.
+- **Start, rename, delete**: listed under "Templates" on `/workout`
+  before a workout starts.
+- **Repeat**: under a past or imported workout in History, starts a new
+  workout with the same exercises and set counts. This part needs no
+  migration.
+
 ## Short logs don't count toward the streak
 
 No migration needed — this is pure application logic in

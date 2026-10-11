@@ -2,10 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   EXERCISES,
   buildSetPayload,
+  defaultTemplateName,
+  draftFromPlan,
   formatElapsed,
   formatSet,
   groupSetsByExercise,
   lastSessionSets,
+  planFromDraft,
+  planFromSets,
   searchExercises,
   workoutDurationMinutes,
   type DraftWorkout,
@@ -127,5 +131,55 @@ describe("groupSetsByExercise", () => {
       ["Bench", 2],
       ["Row", 1],
     ]);
+  });
+});
+
+describe("workout plans (templates and Repeat)", () => {
+  it("turns an in-progress workout into a plan, keeping every set row", () => {
+    const plan = planFromDraft(
+      draft([
+        { key: "a", exerciseId: "Barbell_Squat", name: "Barbell Squat", equipment: "barbell", sets: [{ weight: "", reps: "" }, { weight: "135", reps: "5" }] },
+        { key: "b", exerciseId: null, name: "Sled push", equipment: null, sets: [] },
+      ])
+    );
+    expect(plan).toEqual([
+      { exercise_id: "Barbell_Squat", exercise_name: "Barbell Squat", equipment: "barbell", sets: 2 },
+      { exercise_id: null, exercise_name: "Sled push", equipment: null, sets: 1 },
+    ]);
+  });
+
+  it("turns saved sets into a plan in exercise order, looking up equipment", () => {
+    const squat = EXERCISES.find((e) => e.name === "Barbell Squat")!;
+    const set = (pos: number, n: number, name: string, id: string | null): SavedSet => ({
+      activity_id: "w1", exercise_id: id, exercise_name: name, exercise_position: pos,
+      set_number: n, weight: 100, reps: 5, unit: "lb",
+    });
+    const plan = planFromSets([
+      set(1, 1, "Bench Press (Barbell)", null),
+      set(0, 2, squat.name, squat.id),
+      set(0, 1, squat.name, squat.id),
+    ]);
+    expect(plan).toEqual([
+      { exercise_id: squat.id, exercise_name: squat.name, equipment: squat.equipment, sets: 2 },
+      { exercise_id: null, exercise_name: "Bench Press (Barbell)", equipment: null, sets: 1 },
+    ]);
+  });
+
+  it("starts a workout from a plan with empty set rows", () => {
+    let n = 0;
+    const w = draftFromPlan(
+      [{ exercise_id: null, exercise_name: "Dips", equipment: null, sets: 3 }],
+      { startedAt: "2026-10-10T15:00:00Z", note: "Push", unit: "kg" },
+      () => `k${++n}`
+    );
+    expect(w.note).toBe("Push");
+    expect(w.exercises).toEqual([
+      { key: "k1", exerciseId: null, name: "Dips", equipment: null, sets: Array(3).fill({ weight: "", reps: "" }) },
+    ]);
+  });
+
+  it("names a template after the workout, or its date", () => {
+    expect(defaultTemplateName("  Leg day ", new Date())).toBe("Leg day");
+    expect(defaultTemplateName(null, new Date(2026, 9, 9))).toBe("Workout Oct 9");
   });
 });

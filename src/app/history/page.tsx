@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCachedUser, getRequestTimeZone } from "@/lib/auth";
 import { BottomNav } from "@/components/BottomNav";
 import { DeleteActivityButton } from "@/components/DeleteActivityButton";
+import { WorkoutActions } from "@/components/WorkoutActions";
 import { ActivityHeatmap } from "@/components/ActivityHeatmap";
 import type { Activity } from "@/lib/types";
 import { daysAgoIso, formatDateKey, formatDisplayDate } from "@/lib/date";
@@ -9,6 +10,7 @@ import { countsTowardStreak } from "@/lib/scoring";
 import {
   formatSet,
   groupSetsByExercise,
+  planFromSets,
   sessionKey,
   type SavedSet,
 } from "@/lib/workout";
@@ -63,7 +65,7 @@ export default async function HistoryPage() {
   const gymIds = activities.filter((a) => a.type === "gym").map((a) => a.id);
   const importedIds = imported.map((w) => w.id);
   const SET_COLUMNS =
-    "activity_id, imported_workout_id, exercise_name, exercise_position, set_number, weight, reps, unit";
+    "activity_id, imported_workout_id, exercise_id, exercise_name, exercise_position, set_number, weight, reps, unit";
   const [{ data: setRows }, { data: importedSetRows }] = await Promise.all([
     gymIds.length
       ? supabase.from("workout_sets").select(SET_COLUMNS).in("activity_id", gymIds)
@@ -130,7 +132,8 @@ export default async function HistoryPage() {
             <p className="text-sm text-muted">No activity logged yet.</p>
           )}
           {entries.map((a) => {
-            const exercises = groupSetsByExercise(setsBySession.get(a.key) ?? []);
+            const sets = setsBySession.get(a.key) ?? [];
+            const exercises = groupSetsByExercise(sets);
             return (
               <div
                 key={a.key}
@@ -174,6 +177,7 @@ export default async function HistoryPage() {
                         </div>
                       ))}
                     </div>
+                    <WorkoutActions plan={planFromSets(sets)} name={a.note} at={a.at} />
                   </details>
                 )}
               </div>

@@ -2,26 +2,32 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Check, Dumbbell, Minus, Plus, Timer, X } from "lucide-react";
+import { Bell, BookmarkPlus, Check, Dumbbell, Minus, Pencil, Plus, Timer, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { ExercisePicker } from "@/components/ExercisePicker";
 import { getExistingSubscription, isPushSupported, subscribeToPush } from "@/lib/push";
 import {
   DEFAULT_REST_SECONDS,
+  REPEAT_PLAN_KEY,
   REST_STEP_SECONDS,
   WORKOUT_DRAFT_KEY as DRAFT_KEY,
   buildSetPayload,
   clampRestSeconds,
+  defaultTemplateName,
+  draftFromPlan,
   equipmentLabel,
   formatElapsed,
   formatSet,
   lastSessionSets,
+  planFromDraft,
   workoutDurationMinutes,
   type DraftExercise,
   type DraftWorkout,
+  type PlanExercise,
   type SavedSet,
   type WeightUnit,
+  type WorkoutTemplate,
 } from "@/lib/workout";
 
 // The in-progress workout survives leaving the page, closing the app, or
@@ -96,6 +102,34 @@ function chime(ctx: AudioContext | null) {
   } catch {}
 }
 
+function newWorkoutBase(): Omit<DraftWorkout, "exercises"> {
+  return {
+    startedAt: new Date().toISOString(),
+    note: "",
+    unit: readUnit(),
+    restSeconds: readRestSeconds(),
+    rest: null,
+  };
+}
+
+// A plan handed over by "Repeat" in History. Read once, then cleared.
+function takeRepeatPlan(): PlanExercise[] | null {
+  try {
+    const raw = sessionStorage.getItem(REPEAT_PLAN_KEY);
+    sessionStorage.removeItem(REPEAT_PLAN_KEY);
+    const plan = raw ? (JSON.parse(raw) as PlanExercise[]) : null;
+    return Array.isArray(plan) && plan.length > 0 ? plan : null;
+  } catch {
+    return null;
+  }
+}
+
+function templateError(code: string | undefined, fallback: string) {
+  return code === "42P01" || code === "PGRST205"
+    ? "Templates aren't set up on the server yet (migration 21)."
+    : fallback;
+}
+
 let keyCounter = 0;
 function newKey() {
   keyCounter += 1;
@@ -117,6 +151,11 @@ export default function WorkoutPage() {
   const [push, setPush] = useState<"on" | "off" | "unsupported" | null>(null);
   const [restOver, setRestOver] = useState(false);
   const [yourExercises, setYourExercises] = useState<string[]>([]);
+  // null = still loading.
+  const [templates, setTemplates] = useState<WorkoutTemplate[] | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [templateSaved, setTemplateSaved] = useState<"idle" | "saving" | "saved">("idle");
   const audioRef = useRef<AudioContext | null>(null);
 
   // Fetches what this person did last time for each named exercise, for
@@ -153,14 +192,37 @@ export default function WorkoutPage() {
   }, []);
 
   useEffect(() => {
-    const draft = readDraft();
+    let draft = readDraft();
+    const plan = takeRepeatPlan();
+    if (plan && draft) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setError("Finish or discard this workout before repeating another one.");
+    } else if (plan) {
+      draft = draftFromPlan(plan, newWorkoutBase(), newKey);
+    }
     // Restoring from localStorage has to happen after mount — the server
     // render can't see it.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setWorkout(draft);
     setLoaded(true);
     if (draft) loadPrevious(Array.from(new Set(draft.exercises.map((e) => e.name))));
   }, [loadPrevious]);
+
+  // Templates for the start screen. A missing table (migration 21 not run
+  // yet) just shows none.
+  const loadTemplates = useCallback(async () => {
+    const { data } = await createClient()
+      .from("workout_templates")
+      .select("id, name, exercises")
+      .order("updated_at", { ascending: false });
+    setTemplates((data ?? []) as WorkoutTemplate[]);
+  }, []);
+
+  const idle = loaded && !workout;
+  useEffect(() => {
+    // setState only runs after the fetch resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (idle) loadTemplates();
+  }, [idle, loadTemplates]);
 
   useEffect(() => {
     if (!workout) return;
@@ -226,17 +288,71 @@ export default function WorkoutPage() {
     setWorkout(next);
   }
 
-  function start() {
+  function start(template?: WorkoutTemplate) {
     setError(null);
     setNow(Date.now());
-    update({
-      startedAt: new Date().toISOString(),
-      note: "",
-      unit: readUnit(),
-      exercises: [],
-      restSeconds: readRestSeconds(),
-      rest: null,
-    });
+    setTemplateSaved("idle");
+    if (!template) {
+      update({ ...newWorkoutBase(), exercises: [] });
+      return;
+    }
+    update(draftFromPlan(template.exercises, { ...newWorkoutBase(), note: template.name }, newKey));
+    loadPrevious(Array.from(new Set(template.exercises.map((e) => e.exercise_name))));
+  }
+
+  async function saveAsTemplate() {
+    if (!workout || templateSaved !== "idle") return;
+    if (workout.exercises.length === 0) {
+      setError("Add an exercise before saving this as a template.");
+      return;
+    }
+    setError(null);
+    setTemplateSaved("saving");
+    const { error: dbError } = await createClient()
+      .from("workout_templates")
+      .insert({
+        name: defaultTemplateName(workout.note, new Date(workout.startedAt)),
+        exercises: planFromDraft(workout),
+      });
+    if (dbError) {
+      setTemplateSaved("idle");
+      setError(templateError(dbError.code, "Couldn't save the template. Try again in a moment."));
+      return;
+    }
+    setTemplateSaved("saved");
+  }
+
+  async function renameTemplate() {
+    if (!renaming) return;
+    const { id } = renaming;
+    const name = renaming.name.trim().slice(0, 80);
+    setRenaming(null);
+    if (!name) return;
+    setTemplates((list) => list?.map((t) => (t.id === id ? { ...t, name } : t)) ?? list);
+    const { error: dbError } = await createClient()
+      .from("workout_templates")
+      .update({ name, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    if (dbError) {
+      setError("Couldn't rename that template.");
+      loadTemplates();
+    }
+  }
+
+  // Two taps, like deleting an activity.
+  async function deleteTemplate(id: string) {
+    if (confirmDelete !== id) {
+      setConfirmDelete(id);
+      setTimeout(() => setConfirmDelete((c) => (c === id ? null : c)), 3000);
+      return;
+    }
+    setConfirmDelete(null);
+    setTemplates((list) => list?.filter((t) => t.id !== id) ?? list);
+    const { error: dbError } = await createClient().from("workout_templates").delete().eq("id", id);
+    if (dbError) {
+      setError("Couldn't delete that template.");
+      loadTemplates();
+    }
   }
 
   function setRestSeconds(seconds: number) {
@@ -468,12 +584,78 @@ export default function WorkoutPage() {
             Track exercises, sets and weights as you go. Finishing logs it as a
             Gym session for your streak.
           </p>
+          {error && (
+            <p className="mt-4 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3 text-sm text-accent">
+              {error}
+            </p>
+          )}
           <button
-            onClick={start}
+            onClick={() => start()}
             className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-accent-2 to-accent px-5 py-4 font-medium text-white shadow-sm shadow-accent/30 transition active:scale-[0.98]"
           >
-            <Dumbbell size={18} /> Start workout
+            <Dumbbell size={18} /> Start empty workout
           </button>
+
+          <h2 className="mt-8 text-sm font-semibold uppercase tracking-wide text-muted">Templates</h2>
+          {templates === null ? (
+            <p className="mt-2 text-sm text-muted">Loading…</p>
+          ) : templates.length === 0 ? (
+            <p className="mt-2 text-sm text-muted">
+              No templates yet. Tap &ldquo;Save as template&rdquo; during a workout or
+              under a past workout in History. History also has Repeat, to do a past
+              workout again.
+            </p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {templates.map((t) => (
+                <div key={t.id} className="rounded-2xl border border-border bg-surface px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    {renaming?.id === t.id ? (
+                      <input
+                        autoFocus
+                        value={renaming.name}
+                        onChange={(e) => setRenaming({ id: t.id, name: e.target.value.slice(0, 80) })}
+                        onBlur={renameTemplate}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") renameTemplate();
+                          if (e.key === "Escape") setRenaming(null);
+                        }}
+                        aria-label="Template name"
+                        className="min-w-0 flex-1 rounded-lg bg-surface-2 px-2 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-accent/40"
+                      />
+                    ) : (
+                      <p className="min-w-0 flex-1 truncate font-medium">{t.name}</p>
+                    )}
+                    <button
+                      onClick={() => setRenaming({ id: t.id, name: t.name })}
+                      aria-label={`Rename ${t.name}`}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-surface-2"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => deleteTemplate(t.id)}
+                      aria-label={confirmDelete === t.id ? "Confirm delete" : `Delete ${t.name}`}
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition ${
+                        confirmDelete === t.id ? "bg-accent text-white" : "text-muted hover:bg-surface-2"
+                      }`}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-xs text-muted">
+                    {t.exercises.map((e) => `${e.sets} × ${e.exercise_name}`).join(" · ")}
+                  </p>
+                  <button
+                    onClick={() => start(t)}
+                    className="mt-3 w-full rounded-xl bg-accent/10 py-2.5 text-sm font-medium text-accent transition active:scale-[0.98]"
+                  >
+                    Start
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <BottomNav />
       </main>
@@ -688,6 +870,22 @@ export default function WorkoutPage() {
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl border border-accent/40 bg-accent/10 px-5 py-3.5 font-medium text-accent transition active:scale-[0.98]"
         >
           <Plus size={18} /> Add exercise
+        </button>
+
+        <button
+          onClick={saveAsTemplate}
+          disabled={templateSaved !== "idle"}
+          className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-surface px-5 py-3 text-sm font-medium disabled:opacity-70"
+        >
+          {templateSaved === "saved" ? (
+            <>
+              <Check size={16} /> Saved to templates
+            </>
+          ) : (
+            <>
+              <BookmarkPlus size={16} /> {templateSaved === "saving" ? "Saving…" : "Save as template"}
+            </>
+          )}
         </button>
 
         <button
