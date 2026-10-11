@@ -61,6 +61,7 @@ export interface SavedSet {
   activity_id: string | null;
   imported_workout_id?: string | null;
   performed_at?: string;
+  exercise_id?: string | null;
   exercise_name: string;
   exercise_position: number;
   set_number: number;
@@ -223,6 +224,83 @@ export function groupSetsByExercise(sets: SavedSet[]): ExerciseSummary[] {
   }
   return Array.from(byPosition.values());
 }
+
+/** One exercise in a template or repeated workout: what to do and how
+ * many sets, not the numbers (the Previous column supplies those). */
+export interface PlanExercise {
+  exercise_id: string | null;
+  exercise_name: string;
+  equipment: string | null;
+  sets: number;
+}
+
+/** A workout_templates row (migration 21). */
+export interface WorkoutTemplate {
+  id: string;
+  name: string;
+  exercises: PlanExercise[];
+}
+
+export const MAX_PLAN_SETS = 20;
+const EXERCISES_BY_ID = new Map(EXERCISES.map((e) => [e.id, e]));
+
+function clampSets(n: number): number {
+  return Math.min(MAX_PLAN_SETS, Math.max(1, Math.round(n) || 1));
+}
+
+/** The exercises of an in-progress workout, for "Save as template". */
+export function planFromDraft(workout: DraftWorkout): PlanExercise[] {
+  return workout.exercises.map((e) => ({
+    exercise_id: e.exerciseId,
+    exercise_name: e.name,
+    equipment: e.equipment,
+    sets: clampSets(e.sets.length),
+  }));
+}
+
+/** The exercises of a finished or imported workout, from its saved sets,
+ * for "Repeat" and "Save as template" in History. Equipment isn't saved
+ * with a set, so it's looked up in the exercise list (custom and Strong
+ * names just have none). */
+export function planFromSets(sets: SavedSet[]): PlanExercise[] {
+  return groupSetsByExercise(sets).map((group) => {
+    const id = group.sets[0].exercise_id ?? null;
+    return {
+      exercise_id: id,
+      exercise_name: group.name,
+      equipment: (id && EXERCISES_BY_ID.get(id)?.equipment) || null,
+      sets: clampSets(group.sets.length),
+    };
+  });
+}
+
+/** A fresh workout pre-filled with a plan's exercises and empty sets. */
+export function draftFromPlan(
+  plan: PlanExercise[],
+  base: Omit<DraftWorkout, "exercises">,
+  newKey: () => string
+): DraftWorkout {
+  return {
+    ...base,
+    exercises: plan.map((p) => ({
+      key: newKey(),
+      exerciseId: p.exercise_id,
+      name: p.exercise_name,
+      equipment: p.equipment,
+      sets: Array.from({ length: clampSets(p.sets) }, () => ({ weight: "", reps: "" })),
+    })),
+  };
+}
+
+/** Default template name: the workout's own name, else e.g. "Workout Oct 9". */
+export function defaultTemplateName(name: string | null, at: Date): string {
+  const trimmed = (name ?? "").trim().slice(0, 80);
+  if (trimmed) return trimmed;
+  return `Workout ${at.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+}
+
+/** sessionStorage key handing a plan from History's "Repeat" to /workout. */
+export const REPEAT_PLAN_KEY = "streakly-repeat-plan";
 
 /** localStorage key for the in-progress workout (see src/app/workout). */
 export const WORKOUT_DRAFT_KEY = "streakly-active-workout";
