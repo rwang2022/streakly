@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import type { ActivityType } from "@/lib/types";
 import { WORKOUT_DRAFT_KEY } from "@/lib/workout";
+import { haptic } from "@/lib/haptics";
 
 const TYPES: { value: ActivityType; label: string; icon: React.ReactNode }[] = [
   { value: "gym", label: "Gym", icon: <Dumbbell size={20} /> },
@@ -36,6 +37,7 @@ export default function LogActivityPage() {
   }, []);
 
   async function handleSave() {
+    haptic();
     setError(null);
 
     const parsedDuration = duration.trim() ? Number(duration) : null;
