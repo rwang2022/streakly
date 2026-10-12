@@ -6,6 +6,7 @@ import { Bell, BookmarkPlus, Check, Dumbbell, Minus, Pencil, Plus, Timer, Trash2
 import { createClient } from "@/lib/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
 import { ExercisePicker } from "@/components/ExercisePicker";
+import { haptic } from "@/lib/haptics";
 import { getExistingSubscription, isPushSupported, subscribeToPush } from "@/lib/push";
 import {
   DEFAULT_REST_SECONDS,
@@ -289,6 +290,7 @@ export default function WorkoutPage() {
   }
 
   function start(template?: WorkoutTemplate) {
+    haptic();
     setError(null);
     setNow(Date.now());
     setTemplateSaved("idle");
@@ -408,6 +410,7 @@ export default function WorkoutPage() {
     const ex = workout.exercises.find((e) => e.key === key);
     const set = ex?.sets[index];
     if (!ex || !set) return;
+    haptic();
     if (set.done) {
       updateExercise(key, (e) => ({
         ...e,
@@ -530,6 +533,7 @@ export default function WorkoutPage() {
 
   async function finish() {
     if (!workout) return;
+    haptic();
     setError(null);
     const sets = buildSetPayload(workout);
     if (sets.length === 0) {
