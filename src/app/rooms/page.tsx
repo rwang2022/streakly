@@ -112,23 +112,22 @@ export default function RoomsPage() {
     setJoining(true);
 
     const code = joinCode.trim().toUpperCase();
-    // Members-only RLS on `rooms` (migration_12) means a direct table
-    // select can't see a room you haven't joined yet — this RPC is the
-    // sanctioned lookup path for "I have a code, what room is it".
-    const { data: roomRows } = await supabase.rpc("get_room_by_invite_code", {
-      code,
-    });
-    const room = roomRows?.[0] ?? null;
+    // join_room_by_code (migration 22) checks the code and adds the
+    // membership in one step; inserting into room_memberships directly is
+    // no longer allowed (migration 23).
+    const { data: joinedRoomId, error: joinError } = await supabase.rpc(
+      "join_room_by_code",
+      { code }
+    );
 
-    if (!room) {
-      setError("No room found for that code.");
+    if (joinError || !joinedRoomId) {
+      setError(
+        joinError ? "Couldn't join that room. Try again." : "No room found for that code."
+      );
       setJoining(false);
       return;
     }
 
-    await supabase
-      .from("room_memberships")
-      .upsert({ room_id: room.id, user_id: myId });
     setJoinCode("");
     await loadRooms(myId);
     setJoining(false);

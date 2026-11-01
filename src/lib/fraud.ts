@@ -38,9 +38,9 @@ type SuspicionActivity = Pick<
  *    (regardless of what date they claim to be logged on) — someone
  *    rapid-firing the log button to backfill a bunch of entries at once.
  *
- * This is a visible flag, not a score adjustment: friends can see it and
- * call it out, rather than someone's score silently changing for reasons
- * they can't see.
+ * The flag is always visible, with its reason, so a score never changes for
+ * reasons the person can't see. lib/leaderboard.ts applies the -100 penalty
+ * unless an admin's vouch clears it (see lib/vouches.ts, lib/moderation.ts).
  */
 export function detectSuspiciousPattern(
   activities: SuspicionActivity[],
@@ -97,9 +97,12 @@ function detectIdenticalDayRun(
   const sortedKeys = Array.from(minutesByDate.keys()).sort();
   if (sortedKeys.length === 0) return { suspicious: false, reason: null };
 
-  let bestRun = 1;
-  let bestValue = minutesByDate.get(sortedKeys[0]) ?? 0;
+  // Check every run against the thresholds as it grows, not just the single
+  // longest run. Tracking only the longest one let an earlier, harmless run
+  // (say six days at 30 min) hide a later suspicious one (five days at 300).
   let curRun = 1;
+  let flaggedRun = 0;
+  let flaggedValue = 0;
 
   for (let i = 1; i < sortedKeys.length; i++) {
     const prevKey = sortedKeys[i - 1];
@@ -110,19 +113,20 @@ function detectIdenticalDayRun(
 
     curRun = isConsecutiveDay && curVal === prevVal ? curRun + 1 : 1;
 
-    if (curRun > bestRun) {
-      bestRun = curRun;
-      bestValue = curVal;
+    if (
+      curRun >= SUSPICIOUS_DAY_RUN_LENGTH &&
+      curVal >= SUSPICIOUS_DURATION_THRESHOLD_MINUTES &&
+      curRun > flaggedRun
+    ) {
+      flaggedRun = curRun;
+      flaggedValue = curVal;
     }
   }
 
-  if (
-    bestRun >= SUSPICIOUS_DAY_RUN_LENGTH &&
-    bestValue >= SUSPICIOUS_DURATION_THRESHOLD_MINUTES
-  ) {
+  if (flaggedRun > 0) {
     return {
       suspicious: true,
-      reason: `${bestRun} days in a row logged at exactly ${bestValue} min`,
+      reason: `${flaggedRun} days in a row logged at exactly ${flaggedValue} min`,
     };
   }
 

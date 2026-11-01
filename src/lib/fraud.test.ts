@@ -61,6 +61,16 @@ describe("detectSuspiciousPattern", () => {
     expect(result.reason).toMatch(/days in a row/);
   });
 
+  it("flags a suspicious run even after a longer, harmless identical run", () => {
+    // Regression test: the detector used to remember only the longest run, so
+    // six days at 20 min (harmless) hid a later five days at 300 min.
+    const harmless = [11, 10, 9, 8, 7, 6].map((d) => dayEntry(d, 20));
+    const suspicious = [4, 3, 2, 1, 0].map((d) => dayEntry(d, 300));
+    const result = detectSuspiciousPattern([...harmless, ...suspicious], TZ);
+    expect(result.suspicious).toBe(true);
+    expect(result.reason).toMatch(/5 days in a row logged at exactly 300 min/);
+  });
+
   it("does not flag a burst of a few activities logged close together", () => {
     // Someone logging 3 real activities back to back (e.g. catching up
     // after a busy week) shouldn't trip the burst detector.

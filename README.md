@@ -372,6 +372,36 @@ numbers as usual. Templates are private to their owner.
   workout with the same exercises and set counts. This part needs no
   migration.
 
+## Migrations 22 and 23: admin and room-join lockdown (security fix)
+
+A re-audit found two holes and two gaps. Run them in this order:
+
+1. **Run `supabase/migration_22_admin_and_join_lockdown.sql`.** Safe to run
+   before deploying the new app version.
+   - **`is_admin` was user-editable.** The profiles update policy checked
+     which row you updated, never which columns, so any signed-in user could
+     set their own `is_admin` to true through the REST API. Signed-in users
+     now only have column-level write access to `username`, `display_name`,
+     and `avatar_url`.
+   - **Creating a room was failing.** Migration 12 made `rooms` readable by
+     members only, but a creator isn't a member yet when the app reads the
+     new room back. Creators can now read the rooms they created.
+   - **Joining never checked the invite code.** Anyone who knew a room's id
+     (it appears in URLs) could insert a membership row. The new
+     `join_room_by_code(code)` function checks the code and adds the
+     membership in one step.
+   - **`created_at` was client-settable,** which let someone dodge the 12/day
+     rate limit and burst detection. A trigger now always sets it to `now()`.
+2. **Deploy the app.** The join page and the Rooms page now call
+   `join_room_by_code`.
+3. **Run `supabase/migration_23_require_code_to_join.sql`.** Removes direct
+   inserts into `room_memberships`, except a creator adding themselves to a
+   room they just created.
+
+Invite codes are also now generated with `crypto.getRandomValues` instead of
+`Math.random`, and the identical-duration fraud check now checks every run,
+not just the longest one (with a regression test).
+
 ## Short logs don't count toward the streak
 
 No migration needed — this is pure application logic in
@@ -489,10 +519,11 @@ Once set up, anyone can turn reminders on/off and pick the hour from
 npm test
 ```
 
-Runs the vitest suite covering `lib/scoring.ts` and `lib/fraud.ts` — the
-two most consequential pieces of pure logic in the app (they decide
-everyone's score and who gets penalized), so they're the ones worth
-having a safety net around.
+Runs the vitest suite covering the pure logic: `lib/scoring.ts` and
+`lib/fraud.ts` (they decide everyone's score and who gets penalized), plus
+moderation rules, workouts, reminders, Strong CSV import, and invite codes.
+The database policies, constraints, and triggers aren't covered by
+automated tests yet.
 
 ## Settings: data export & delete
 
@@ -528,3 +559,11 @@ succeed," not a single bug report:
   surfaces insert errors instead of silently claiming success when a save
   is rejected (e.g. by the rate limit or date-sanity check).
 
+## How this was built
+
+I built Streakly with Claude, an AI coding agent, as a pair programmer. I
+decided what to build and how it should work, set the security goals,
+reviewed the changes, tested the app on my phone with friends, ran the
+database migrations, and deployed it. Commits authored "Claude" or
+"Claude (Cowork)" were written by the agent under my direction. Workout
+templates and haptics came in as pull requests #1 and #2 from Anthony He.

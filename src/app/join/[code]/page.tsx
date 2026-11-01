@@ -88,17 +88,28 @@ export default function JoinRoomPage({
     if (!room) return;
     setStatus("joining");
     const supabase = createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const user = session?.user ?? null;
-    if (!user) return;
 
-    await supabase
-      .from("room_memberships")
-      .upsert({ room_id: room.id, user_id: user.id });
+    // join_room_by_code (migration 22) checks the invite code and adds the
+    // membership in one step. Inserting into room_memberships directly is no
+    // longer allowed (migration 23), so knowing a room's id isn't enough.
+    const { data: joinedRoomId, error: joinError } = await supabase.rpc(
+      "join_room_by_code",
+      { code: decodeURIComponent(code).toUpperCase() }
+    );
+
+    if (joinError) {
+      console.error("join failed:", joinError);
+      setErrorDetail(`${joinError.code ?? ""} ${joinError.message ?? ""}`.trim());
+      setStatus("error");
+      return;
+    }
+    if (!joinedRoomId) {
+      setStatus("not-found");
+      return;
+    }
+
     setStatus("joined");
-    setTimeout(() => router.push(`/leaderboard?room=${room.id}`), 900);
+    setTimeout(() => router.push(`/leaderboard?room=${joinedRoomId}`), 900);
   }
 
   // Reaching "ready" means: signed in, profile set up, room found, not yet
